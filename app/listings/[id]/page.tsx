@@ -25,7 +25,8 @@ async function getListing(id: string) {
   return listing
 }
 
-export default async function ListingPage({ params }: { params: { id: string } }) {
+export default async function ListingPage(props: { params: { id: string } }) {
+  const { params } = props
   const listing = await getListing(params.id)
 
   if (!listing) {

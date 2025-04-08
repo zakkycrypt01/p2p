@@ -38,7 +38,7 @@ export function BalanceDisplay() {
         setBalances([
           { symbol: "SUI", icon: "/tokens/sui.png", balance: 125.45 },
           { symbol: "USDC", icon: "/tokens/usdc.png", balance: 500.0 },
-          { symbol: "ETH", icon: "/tokens/eth.png", balance: 0.5 },
+          { symbol: "USDT", icon: "/tokens/usdt.png", balance: 0.5 },
         ])
       } catch (error) {
         console.error("Failed to fetch balances:", error)
