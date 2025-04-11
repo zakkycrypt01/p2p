@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useWallet } from "@/hooks/use-wallet"
+import { useCurrentAccount } from "@mysten/dapp-kit"
 import { NotificationItem } from "@/components/notifications/notification-item"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
@@ -29,7 +29,8 @@ export interface Notification {
 }
 
 export function NotificationDropdown() {
-  const { address } = useWallet()
+  const currentAccount = useCurrentAccount()
+  const address = currentAccount?.address
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
 
@@ -71,7 +72,7 @@ export function NotificationDropdown() {
       {
         id: "4",
         type: "system",
-        title: "Welcome to SuiXchange",
+        title: "Welcome to P2P Exchange",
         message: "Thank you for joining our platform. Start trading now!",
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
         read: true,
@@ -141,4 +142,3 @@ export function NotificationDropdown() {
     </DropdownMenu>
   )
 }
-

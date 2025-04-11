@@ -6,13 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatsOverview } from "@/components/dashboard/stats-overview"
 import { MyListings } from "@/components/dashboard/my-listings"
 import { MyTrades } from "@/components/dashboard/my-trades"
-import { useWallet } from "@/hooks/use-wallet"
+import { useCurrentAccount } from "@mysten/dapp-kit"
 import Link from "next/link"
 import { PlusCircle, BookOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default function Dashboard() {
-  const { address } = useWallet()
+  const currentAccount = useCurrentAccount()
+  const address = currentAccount?.address
   const router = useRouter()
   const searchParams = useSearchParams()
   const tab = searchParams.get("tab") || "listings"
@@ -80,4 +81,3 @@ export default function Dashboard() {
     </div>
   )
 }
-

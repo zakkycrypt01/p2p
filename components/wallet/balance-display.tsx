@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useWallet } from "@/hooks/use-wallet"
+import { useCurrentAccount } from "@mysten/dapp-kit"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Coins } from "lucide-react"
 import Image from "next/image"
+import { useState, useEffect } from "react"
 
 interface TokenBalance {
   symbol: string
@@ -21,24 +21,27 @@ interface TokenBalance {
 }
 
 export function BalanceDisplay() {
-  const { address } = useWallet()
+  const currentAccount = useCurrentAccount()
   const [balances, setBalances] = useState<TokenBalance[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // In a real app, you would use useSuiClientQuery to fetch real balances
+  // const { data: balanceData, isLoading } = useSuiClientQuery('getBalance', {
+  //   owner: currentAccount?.address,
+  // })
 
   useEffect(() => {
-    if (!address) return
+    if (!currentAccount?.address) return
 
+    // Mock data for demonstration
     const fetchBalances = async () => {
       setIsLoading(true)
       try {
-        // This would be a real API call in production
-        // Simulating API response
         await new Promise((resolve) => setTimeout(resolve, 1000))
-
         setBalances([
           { symbol: "SUI", icon: "/tokens/sui.png", balance: 125.45 },
           { symbol: "USDC", icon: "/tokens/usdc.png", balance: 500.0 },
-          { symbol: "USDT", icon: "/tokens/usdt.png", balance: 0.5 },
+          { symbol: "ETH", icon: "/tokens/eth.png", balance: 0.5 },
         ])
       } catch (error) {
         console.error("Failed to fetch balances:", error)
@@ -48,9 +51,9 @@ export function BalanceDisplay() {
     }
 
     fetchBalances()
-  }, [address])
+  }, [currentAccount?.address])
 
-  if (!address) return null
+  if (!currentAccount?.address) return null
 
   return (
     <DropdownMenu>
@@ -67,7 +70,7 @@ export function BalanceDisplay() {
           <div className="p-2 text-center">
             <span className="text-sm text-muted-foreground">Loading...</span>
           </div>
-        ) : balances.length > 0 ? (
+        ) : balances && balances.length > 0 ? (
           balances.map((token) => (
             <DropdownMenuItem key={token.symbol} className="flex justify-between items-center">
               <div className="flex items-center gap-2">
@@ -92,4 +95,3 @@ export function BalanceDisplay() {
     </DropdownMenu>
   )
 }
-

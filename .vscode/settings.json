@@ -1,3 +1,4 @@
 {
-    "move.server.path": "./home/zakky/.cargo/bin/move-analyzer"
+    "move.server.path": "/home/zakky/.cargo/bin/move-analyzer"
+
 }

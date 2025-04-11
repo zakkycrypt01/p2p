@@ -6,7 +6,7 @@ import { Package2, Menu, ShoppingCart, User } from "lucide-react"
 import { ConnectButton } from "@/components/wallet/connect-button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { useWallet } from "@/hooks/use-wallet"
+import { useCurrentAccount } from "@mysten/dapp-kit"
 import { usePathname } from "next/navigation"
 import {
   DropdownMenu,
@@ -23,7 +23,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { BalanceDisplay } from "@/components/wallet/balance-display"
 
 export function Navbar() {
-  const { address } = useWallet()
+  const currentAccount = useCurrentAccount()
+  const address = currentAccount?.address
   const pathname = usePathname()
   const [showMobileMenu, setShowMobileMenu] = useState(false)
 
@@ -33,7 +34,7 @@ export function Navbar() {
         <div className="flex items-center gap-6">
           <Link href={address ? "/dashboard" : "/"} className="flex items-center gap-2 font-semibold">
             <Package2 className="h-6 w-6 text-primary" />
-            <span className="hidden sm:inline">SuiXchange</span>
+            <span className="hidden sm:inline">P2P Exchange</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -72,7 +73,7 @@ export function Navbar() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left">
-                <NavigationMenu address={address} onClose={() => setShowMobileMenu(false)} />
+                <NavigationMenu address={address ?? null} onClose={() => setShowMobileMenu(false)} />
               </SheetContent>
             </Sheet>
           </div>
@@ -133,4 +134,3 @@ export function Navbar() {
     </header>
   )
 }
-

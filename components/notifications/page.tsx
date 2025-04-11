@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useCurrentAccount } from "@mysten/dapp-kit"
+import { useSuiWallet } from "@/hooks/use-sui-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -10,8 +10,7 @@ import { ShoppingCart, CreditCard, CheckCircle, XCircle, Bell, AlertCircle } fro
 import type { Notification } from "@/components/notifications/notification-dropdown"
 
 export default function NotificationsPage() {
-  const currentAccount = useCurrentAccount()
-  const address = currentAccount?.address
+  const { address } = useSuiWallet()
   const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [activeTab, setActiveTab] = useState("all")

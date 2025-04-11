@@ -15,7 +15,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { useWallet } from "@/hooks/use-wallet"
+import { useDisconnectWallet } from "@mysten/dapp-kit"
 
 interface NavigationMenuProps {
   address: string | null
@@ -23,7 +23,7 @@ interface NavigationMenuProps {
 }
 
 export function NavigationMenu({ address, onClose }: NavigationMenuProps) {
-  const { disconnect } = useWallet()
+  const { mutate: disconnect } = useDisconnectWallet()
 
   const handleNavigation = () => {
     if (onClose) {
@@ -35,7 +35,7 @@ export function NavigationMenu({ address, onClose }: NavigationMenuProps) {
     <div className="flex flex-col h-full py-6">
       <div className="flex items-center gap-2 font-semibold mb-6">
         <Package2 className="h-6 w-6 text-primary" />
-        <span>SuiXchange</span>
+        <span>P2P Exchange</span>
       </div>
 
       <nav className="space-y-1">
@@ -139,4 +139,3 @@ export function NavigationMenu({ address, onClose }: NavigationMenuProps) {
     </div>
   )
 }
-

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useWallet } from "@/hooks/use-wallet"
+import { useCurrentAccount } from "@mysten/dapp-kit"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -23,7 +23,8 @@ interface Trade {
 }
 
 export function MyTrades() {
-  const { address } = useWallet()
+  const currentAccount = useCurrentAccount()
+  const address = currentAccount?.address
   const [trades, setTrades] = useState<Trade[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -191,4 +192,3 @@ export function MyTrades() {
     </div>
   )
 }
-

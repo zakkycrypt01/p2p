@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useWallet } from "@/hooks/use-wallet"
+import { useCurrentAccount } from "@mysten/dapp-kit"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -27,7 +27,8 @@ interface Order {
 }
 
 export default function MerchantOrdersPage() {
-  const { address } = useWallet()
+  const currentAccount = useCurrentAccount()
+  const address = currentAccount?.address
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
@@ -283,4 +284,3 @@ export default function MerchantOrdersPage() {
     </div>
   )
 }
-

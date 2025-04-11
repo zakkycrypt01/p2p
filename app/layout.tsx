@@ -4,7 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { WebSocketProvider } from "@/providers/web-socket-provider"
-import { WalletProvider } from "@/providers/wallet-provider"
+import { SuiProvider } from "@/providers/sui-provider"
 import { Navbar } from "@/components/navbar"
 import { Toaster } from "@/components/ui/toaster"
 
@@ -24,7 +24,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <WalletProvider>
+          <SuiProvider>
             <WebSocketProvider>
               <div className="min-h-screen flex flex-col">
                 <Navbar />
@@ -32,13 +32,9 @@ export default function RootLayout({
                 <Toaster />
               </div>
             </WebSocketProvider>
-          </WalletProvider>
+          </SuiProvider>
         </ThemeProvider>
       </body>
     </html>
   )
 }
-
-
-
-import './globals.css'

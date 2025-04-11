@@ -3,10 +3,11 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { NewListingForm } from "@/components/listings/new-listing-form"
-import { useWallet } from "@/hooks/use-wallet"
+import { useCurrentAccount } from "@mysten/dapp-kit"
 
 export default function NewListing() {
-  const { address } = useWallet()
+  const currentAccount = useCurrentAccount()
+  const address = currentAccount?.address
   const router = useRouter()
 
   // Redirect to home if wallet is not connected
@@ -28,4 +29,3 @@ export default function NewListing() {
     </div>
   )
 }
-

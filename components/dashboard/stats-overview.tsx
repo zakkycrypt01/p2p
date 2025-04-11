@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BarChart, LineChart, PieChart } from "lucide-react"
-import { useWallet } from "@/hooks/use-wallet"
+import { useCurrentAccount } from "@mysten/dapp-kit"
 import {
   Bar,
   BarChart as RechartsBarChart,
@@ -46,7 +46,8 @@ const statusData = [
 const COLORS = ["#3b82f6", "#60a5fa", "#93c5fd", "#bfdbfe", "#dbeafe"]
 
 export function StatsOverview() {
-  const { address } = useWallet()
+  const currentAccount = useCurrentAccount()
+  const address = currentAccount?.address
 
   if (!address) {
     return (
@@ -174,4 +175,3 @@ export function StatsOverview() {
     </div>
   )
 }
-
