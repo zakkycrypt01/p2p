@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useWallet } from "@/hooks/use-sui-wallet"
+import { useSuiWallet } from "@/hooks/use-sui-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
@@ -10,12 +10,12 @@ import { AlertCircle, CheckCircle2, XCircle } from "lucide-react"
 interface ReleaseRefundButtonsProps {
   tradeId: string
   isSeller: boolean
-  onRelease: () => void
-  onRefund: () => void
+  onReleaseAction: () => void
+  onRefundAction: () => void
 }
 
-export function ReleaseRefundButtons({ tradeId, isSeller, onRelease, onRefund }: ReleaseRefundButtonsProps) {
-  const { address } = useWallet()
+export function ReleaseRefundButtons({ tradeId, isSeller, onReleaseAction, onRefundAction }: ReleaseRefundButtonsProps) {
+  const { address } = useSuiWallet()
   const { toast } = useToast()
   const [isReleasing, setIsReleasing] = useState(false)
   const [isRefunding, setIsRefunding] = useState(false)
@@ -44,7 +44,7 @@ export function ReleaseRefundButtons({ tradeId, isSeller, onRelease, onRefund }:
         description: "You have successfully released the funds to the buyer",
       })
 
-      onRelease()
+      onReleaseAction()
     } catch (error) {
       console.error("Error releasing funds:", error)
       toast({
@@ -81,7 +81,7 @@ export function ReleaseRefundButtons({ tradeId, isSeller, onRelease, onRefund }:
         description: "You have successfully claimed a refund",
       })
 
-      onRefund()
+      onRefundAction()
     } catch (error) {
       console.error("Error claiming refund:", error)
       toast({

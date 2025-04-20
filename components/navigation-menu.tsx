@@ -35,7 +35,7 @@ export function NavigationMenu({ address, onClose }: NavigationMenuProps) {
     <div className="flex flex-col h-full py-6">
       <div className="flex items-center gap-2 font-semibold mb-6">
         <Package2 className="h-6 w-6 text-primary" />
-        <span>P2P Exchange</span>
+        <span>SuiXchange</span>
       </div>
 
       <nav className="space-y-1">

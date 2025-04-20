@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useWallet } from "@/hooks/use-sui-wallet"
+import { useSuiWallet } from "@/hooks/use-sui-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,7 @@ import { ArrowUpRight, ArrowDownRight, User, Clock, AlertCircle, Copy, ExternalL
 import Image from "next/image"
 import Link from "next/link"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { use } from "react"
 
 interface Order {
   id: string
@@ -39,7 +40,10 @@ interface Order {
 }
 
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
-  const { address } = useWallet()
+  // Unwrap params using React.use()
+  const orderId = params.id
+
+  const { address } = useSuiWallet()
   const router = useRouter()
   const { toast } = useToast()
   const [order, setOrder] = useState<Order | null>(null)
@@ -60,25 +64,25 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
         // Mock order data
         const mockOrder: Order = {
-          id: params.id,
-          tradeId: `trade-${params.id.split("-")[1]}`,
+          id: orderId,
+          tradeId: `trade-${orderId.split("-")[1]}`,
           tokenSymbol: "SUI",
           tokenIcon: "/tokens/sui.png",
           amount: 10,
           price: 1.25,
           fiatCurrency: "USD",
           counterpartyAddress: "0xabc...def",
-          orderType: params.id === "order-2" || params.id === "order-4" || params.id === "order-6" ? "sell" : "buy",
+          orderType: orderId === "order-2" || orderId === "order-4" || orderId === "order-6" ? "sell" : "buy",
           status:
-            params.id === "order-1"
+            orderId === "order-1"
               ? "pending_payment"
-              : params.id === "order-2"
+              : orderId === "order-2"
                 ? "payment_sent"
-                : params.id === "order-3"
+                : orderId === "order-3"
                   ? "payment_confirmed"
-                  : params.id === "order-4"
+                  : orderId === "order-4"
                     ? "completed"
-                    : params.id === "order-5"
+                    : orderId === "order-5"
                       ? "cancelled"
                       : "disputed",
           createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
@@ -91,7 +95,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             instructions: "Please include the trade ID in the payment reference",
           },
           paymentProofUrl:
-            params.id === "order-2" || params.id === "order-3" ? "/placeholder.svg?height=300&width=400" : undefined,
+            orderId === "order-2" || orderId === "order-3" ? "/placeholder.svg?height=300&width=400" : undefined,
           paymentWindow: 30,
           releaseTime: 15,
         }
@@ -110,7 +114,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     }
 
     fetchOrder()
-  }, [address, params.id, router, toast])
+  }, [address, orderId, router, toast])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString()

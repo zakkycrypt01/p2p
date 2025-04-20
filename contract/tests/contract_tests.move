@@ -1,6 +1,6 @@
 
 #[test_only]
-module contract::contract_tests;
+module escrow::contract_tests;
 // uncomment this line to import the module
 // use contract::contract;
 
@@ -11,7 +11,7 @@ fun test_contract() {
     // pass
 }
 
-#[test, expected_failure(abort_code = ::contract::contract_tests::ENotImplemented)]
+#[test, expected_failure(abort_code = ::escrow::contract_tests::ENotImplemented)]
 fun test_contract_fail() {
     abort ENotImplemented
 }

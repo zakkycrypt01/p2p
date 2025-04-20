@@ -57,7 +57,7 @@ export default function NotificationsPage() {
       {
         id: "4",
         type: "system",
-        title: "Welcome to P2P Exchange",
+        title: "Welcome to SuiXchange",
         message: "Thank you for joining our platform. Start trading now!",
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
         read: true,

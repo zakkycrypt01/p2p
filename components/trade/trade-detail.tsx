@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useWallet } from "@/hooks/use-sui-wallet"
+import { useSuiWallet } from "@/hooks/use-sui-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +15,7 @@ import { Star, User, Clock, AlertCircle, ArrowUpRight, ArrowDownRight, CheckCirc
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { CardFooter } from "@/components/ui/card"
+import { useContract } from "@/hooks/useContract"
 
 interface Listing {
   id: string
@@ -25,7 +26,7 @@ interface Listing {
   fiatCurrency: string
   sellerAddress: string
   sellerRating: number
-  paymentMethods: string[]
+  paymentMethod: string[]
   status: "open" | "pending" | "completed" | "cancelled"
   createdAt: string
   description?: string
@@ -51,20 +52,25 @@ interface TradeDetailProps {
 
 // Update the TradeDetail component to reflect the correct flow
 export function TradeDetail({ listing }: TradeDetailProps) {
-  const { address } = useWallet()
+  // Normalize the listing data to match the expected format
+  const normalizedListing = {
+    ...listing,
+    paymentMethods: listing.paymentMethod || [], // Convert paymentMethod to paymentMethods
+    status: listing.status?.toLowerCase() === "active" ? "open" : listing.status?.toLowerCase() // Convert status to lowercase
+  };
+
+  const { address } = useSuiWallet()
   const router = useRouter()
   const { toast } = useToast()
-  const [status, setStatus] = useState(listing.status)
+  const [status, setStatus] = useState(normalizedListing.status)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null)
   const [paymentConfirmed, setPaymentConfirmed] = useState(false)
 
-  const isOwner = address === listing.sellerAddress
+  const isOwner = address === normalizedListing.sellerAddress
   const canAccept = !isOwner && status === "open"
   const showTradeActions = status === "pending" && (isOwner || address)
-  const isBuyOrder = listing.orderType === "buy"
+  const isBuyOrder = normalizedListing.orderType === "buy"
 
-  // For selling: User chooses merchant buy listings, merchant pays user, user releases crypto
-  // For buying: User chooses merchant sell listings, user pays merchant, merchant releases crypto
   const userIsSelling = !isOwner && isBuyOrder
   const userIsBuying = !isOwner && !isBuyOrder
 
@@ -109,23 +115,23 @@ export function TradeDetail({ listing }: TradeDetailProps) {
   }
 
   // Mock payment details
-  const paymentDetails = listing.paymentDetails || {
+  const paymentDetails = normalizedListing.paymentDetails || {
     bank_transfer: {
-      accountName: userIsSelling ? "Your Bank Account" : "Merchant Bank Account",
-      accountNumber: userIsSelling ? "Your Account Number" : "1234567890",
-      bankName: userIsSelling ? "Your Bank" : "Chase Bank",
+      accountName: userIsBuying ? "Your Bank Account" : "Merchant Bank Account",
+      accountNumber: userIsBuying ? "Your Account Number" : "1234567890",
+      bankName: userIsBuying ? "Your Bank" : "Chase Bank",
       instructions: userIsSelling
         ? "The merchant will send payment to this account"
-        : "Please send payment to this account and include the trade ID",
+        : "Please send payment to this account",
     },
     paypal: {
-      accountName: userIsSelling ? "your.email@example.com" : "merchant@example.com",
-      instructions: userIsSelling
+      accountName: userIsBuying ? "your.email@example.com" : "merchant@example.com",
+      instructions: userIsBuying
         ? "The merchant will send payment to this PayPal account"
         : "Send as Friends & Family to avoid fees",
     },
     zelle: {
-      accountName: userIsSelling ? "your.email@example.com" : "merchant@example.com",
+      accountName: userIsBuying ? "your.email@example.com" : "merchant@example.com",
       instructions: userIsSelling ? "The merchant will send payment to this Zelle account" : "Include trade ID in memo",
     },
   }
@@ -138,16 +144,16 @@ export function TradeDetail({ listing }: TradeDetailProps) {
             <div>
               <CardTitle className="text-2xl flex items-center gap-2">
                 <Image
-                  src={listing.tokenIcon || `/tokens/${listing.tokenSymbol.toLowerCase()}.png`}
-                  alt={listing.tokenSymbol}
+                  src={normalizedListing.tokenIcon || `/tokens/${normalizedListing.tokenSymbol.toLowerCase()}.png`}
+                  alt={normalizedListing.tokenSymbol}
                   width={32}
                   height={32}
                   className="rounded-full"
                 />
-                {listing.amount} {listing.tokenSymbol}
+                {normalizedListing.amount} {normalizedListing.tokenSymbol}
               </CardTitle>
               <CardDescription>
-                @ {listing.price} {listing.fiatCurrency} per token
+                @ {normalizedListing.price} {normalizedListing.fiatCurrency} per token
               </CardDescription>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -186,43 +192,43 @@ export function TradeDetail({ listing }: TradeDetailProps) {
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">Total Value</h3>
                 <p className="text-xl font-semibold">
-                  {(listing.amount * listing.price).toFixed(2)} {listing.fiatCurrency}
+                  {(normalizedListing.amount * normalizedListing.price).toFixed(2)} {normalizedListing.fiatCurrency}
                 </p>
               </div>
 
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">Created</h3>
-                <p className="text-sm">{formatDate(listing.createdAt)}</p>
+                <p className="text-sm">{formatDate(normalizedListing.createdAt)}</p>
               </div>
 
-              {listing.expiresAt && (
+              {normalizedListing.expiresAt && (
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Expires</h3>
                   <p className="text-sm flex items-center gap-1">
                     <Clock className="h-4 w-4" />
-                    {formatDate(listing.expiresAt)}
+                    {formatDate(normalizedListing.expiresAt)}
                   </p>
                 </div>
               )}
 
-              {(listing.minAmount || listing.maxAmount) && (
+              {(normalizedListing.minAmount || normalizedListing.maxAmount) && (
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Purchase Limits</h3>
                   <p className="text-sm">
-                    {listing.minAmount && `Min: ${listing.minAmount} ${listing.tokenSymbol}`}
-                    {listing.minAmount && listing.maxAmount && " / "}
-                    {listing.maxAmount && `Max: ${listing.maxAmount} ${listing.tokenSymbol}`}
+                    {normalizedListing.minAmount && `Min: ${normalizedListing.minAmount} ${normalizedListing.tokenSymbol}`}
+                    {normalizedListing.minAmount && normalizedListing.maxAmount && " / "}
+                    {normalizedListing.maxAmount && `Max: ${normalizedListing.maxAmount} ${normalizedListing.tokenSymbol}`}
                   </p>
                 </div>
               )}
 
-              {(listing.paymentWindow || listing.releaseTime) && (
+              {(normalizedListing.paymentWindow || normalizedListing.releaseTime) && (
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground">Time Limits</h3>
                   <p className="text-sm">
-                    {listing.paymentWindow && `Payment Window: ${listing.paymentWindow} minutes`}
-                    {listing.paymentWindow && listing.releaseTime && " / "}
-                    {listing.releaseTime && `Release Time: ${listing.releaseTime} minutes`}
+                    {normalizedListing.paymentWindow && `Payment Window: ${normalizedListing.paymentWindow} minutes`}
+                    {normalizedListing.paymentWindow && normalizedListing.releaseTime && " / "}
+                    {normalizedListing.releaseTime && `Release Time: ${normalizedListing.releaseTime} minutes`}
                   </p>
                 </div>
               )}
@@ -233,20 +239,20 @@ export function TradeDetail({ listing }: TradeDetailProps) {
             <div>
               <h3 className="text-sm font-medium mb-2">Accepted Payment Methods</h3>
               <div className="flex flex-wrap gap-2">
-                {listing.paymentMethods.map((method) => (
+                {normalizedListing.paymentMethod && normalizedListing.paymentMethod.map((method: string) => (
                   <Badge key={method} variant="secondary">
-                    {method}
+                  {method}
                   </Badge>
                 ))}
               </div>
             </div>
 
-            {listing.description && (
+            {normalizedListing.description && (
               <>
                 <Separator />
                 <div>
                   <h3 className="text-sm font-medium mb-2">Description</h3>
-                  <p className="text-sm whitespace-pre-line">{listing.description}</p>
+                  <p className="text-sm whitespace-pre-line">{normalizedListing.description}</p>
                 </div>
               </>
             )}
@@ -297,133 +303,142 @@ export function TradeDetail({ listing }: TradeDetailProps) {
                 <Separator />
                 <div>
                   <h3 className="text-sm font-medium mb-4">Payment Details</h3>
-
-                  <Tabs defaultValue={listing.paymentMethods[0]} onValueChange={setSelectedPaymentMethod}>
-                    <TabsList className="mb-4">
-                      {listing.paymentMethods.map((method) => (
-                        <TabsTrigger key={method} value={method}>
+                  
+                  {normalizedListing.paymentMethods && normalizedListing.paymentMethods.length > 0 ? (
+                    <Tabs 
+                      defaultValue={normalizedListing.paymentMethods[0]} 
+                      onValueChange={setSelectedPaymentMethod}
+                    >
+                      <TabsList className="mb-4">
+                        {normalizedListing.paymentMethod.map((method: string) => (
+                          <TabsTrigger key={method} value={method}>
                           {method}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
 
-                    {listing.paymentMethods.map((method) => {
-                      const details = paymentDetails[method.toLowerCase().replace(" ", "_")]
-                      return (
-                        <TabsContent key={method} value={method} className="space-y-4">
-                          <Card>
-                            <CardContent className="pt-6">
-                              {details && (
-                                <div className="space-y-4">
-                                  {details.bankName && (
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-sm font-medium">Bank Name</span>
-                                      <div className="flex items-center gap-2">
-                                        <span>{details.bankName}</span>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6"
-                                          onClick={() => copyToClipboard(details.bankName!)}
-                                        >
-                                          <Copy className="h-4 w-4" />
-                                        </Button>
+                      {normalizedListing.paymentMethods.map((method) => {
+                        const details = paymentDetails[method.toLowerCase().replace(" ", "_")]
+                        return (
+                          <TabsContent key={method} value={method} className="space-y-4">
+                            <Card>
+                              <CardContent className="pt-6">
+                                {details && (
+                                  <div className="space-y-4">
+                                    {details.bankName && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium">Bank Name</span>
+                                        <div className="flex items-center gap-2">
+                                          <span>{details.bankName}</span>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => copyToClipboard(details.bankName!)}
+                                          >
+                                            <Copy className="h-4 w-4" />
+                                          </Button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
 
-                                  {details.accountName && (
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-sm font-medium">Account Name/Email</span>
-                                      <div className="flex items-center gap-2">
-                                        <span>{details.accountName}</span>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6"
-                                          onClick={() => copyToClipboard(details.accountName!)}
-                                        >
-                                          <Copy className="h-4 w-4" />
-                                        </Button>
+                                    {details.accountName && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium">Account Name/Email</span>
+                                        <div className="flex items-center gap-2">
+                                          <span>{details.accountName}</span>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => copyToClipboard(details.accountName!)}
+                                          >
+                                            <Copy className="h-4 w-4" />
+                                          </Button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
 
-                                  {details.accountNumber && (
-                                    <div className="flex justify-between items-center">
-                                      <span className="text-sm font-medium">Account Number</span>
-                                      <div className="flex items-center gap-2">
-                                        <span>{details.accountNumber}</span>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6"
-                                          onClick={() => copyToClipboard(details.accountNumber!)}
-                                        >
-                                          <Copy className="h-4 w-4" />
-                                        </Button>
+                                    {details.accountNumber && (
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium">Account Number</span>
+                                        <div className="flex items-center gap-2">
+                                          <span>{details.accountNumber}</span>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6"
+                                            onClick={() => copyToClipboard(details.accountNumber!)}
+                                          >
+                                            <Copy className="h-4 w-4" />
+                                          </Button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
 
-                                  {details.instructions && (
-                                    <div>
-                                      <span className="text-sm font-medium">Instructions</span>
-                                      <p className="text-sm mt-1 p-2 bg-muted rounded-md">{details.instructions}</p>
-                                    </div>
-                                  )}
+                                    {details.instructions && (
+                                      <div>
+                                        <span className="text-sm font-medium">Instructions</span>
+                                        <p className="text-sm mt-1 p-2 bg-muted rounded-md">{details.instructions}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                <div className="mt-4">
+                                  <p className="text-sm text-muted-foreground">
+                                    {userIsBuying ? (
+                                      <>
+                                        Please make your payment of{" "}
+                                        <span className="font-medium">
+                                          {(normalizedListing.amount * normalizedListing.price).toFixed(2)} {normalizedListing.fiatCurrency}
+                                        </span>{" "}
+                                        using the details above.
+                                      </>
+                                    ) : userIsSelling ? (
+                                      <>
+                                        You will send payment of{" "}
+                                        <span className="font-medium">
+                                          {(normalizedListing.amount * normalizedListing.price).toFixed(2)} {normalizedListing.fiatCurrency}
+                                        </span>{" "}
+                                        to merchant's account.
+                                      </>
+                                    ) : (
+                                      <>
+                                        Payment amount:{" "}
+                                        <span className="font-medium">
+                                          {(normalizedListing.amount * normalizedListing.price).toFixed(2)} {normalizedListing.fiatCurrency}
+                                        </span>
+                                      </>
+                                    )}
+                                  </p>
                                 </div>
-                              )}
+                              </CardContent>
+                            </Card>
 
-                              <div className="mt-4">
-                                <p className="text-sm text-muted-foreground">
-                                  {userIsBuying ? (
-                                    <>
-                                      Please make your payment of{" "}
-                                      <span className="font-medium">
-                                        {(listing.amount * listing.price).toFixed(2)} {listing.fiatCurrency}
-                                      </span>{" "}
-                                      using the details above.
-                                    </>
-                                  ) : userIsSelling ? (
-                                    <>
-                                      The merchant will send payment of{" "}
-                                      <span className="font-medium">
-                                        {(listing.amount * listing.price).toFixed(2)} {listing.fiatCurrency}
-                                      </span>{" "}
-                                      to your account.
-                                    </>
-                                  ) : (
-                                    <>
-                                      Payment amount:{" "}
-                                      <span className="font-medium">
-                                        {(listing.amount * listing.price).toFixed(2)} {listing.fiatCurrency}
-                                      </span>
-                                    </>
-                                  )}
-                                </p>
-                              </div>
-                            </CardContent>
-                          </Card>
-
-                          {(userIsBuying || userIsSelling) && (
-                            <Button className="w-full" onClick={confirmPayment} disabled={paymentConfirmed}>
-                              {paymentConfirmed ? (
-                                <span className="flex items-center gap-2">
-                                  <CheckCircle className="h-4 w-4" />
-                                  {userIsBuying ? "Payment Sent" : "Payment Received"}
-                                </span>
-                              ) : userIsBuying ? (
-                                "I've Sent the Payment"
-                              ) : (
-                                "I've Received the Payment"
-                              )}
-                            </Button>
-                          )}
-                        </TabsContent>
-                      )
-                    })}
-                  </Tabs>
+                            {(userIsBuying || userIsSelling) && (
+                              <Button className="w-full" onClick={confirmPayment} disabled={paymentConfirmed}>
+                                {paymentConfirmed ? (
+                                  <span className="flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4" />
+                                    {userIsSelling ? "Payment Sent" : "Payment Received"}
+                                  </span>
+                                ) : userIsSelling ? (
+                                  "I've Sent the Payment"
+                                ) : (
+                                  "I've Received the Payment"
+                                )}
+                              </Button>
+                            )}
+                          </TabsContent>
+                        )
+                      })}
+                    </Tabs>
+                  ) : (
+                    <div className="p-4 text-center text-muted-foreground">
+                      No payment methods available
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -443,11 +458,11 @@ export function TradeDetail({ listing }: TradeDetailProps) {
               </div>
               <div>
                 <p className="font-medium">
-                  {listing.sellerAddress.slice(0, 6)}...{listing.sellerAddress.slice(-4)}
+                  {normalizedListing.sellerAddress.slice(0, 6)}...{normalizedListing.sellerAddress.slice(-4)}
                 </p>
                 <div className="flex items-center gap-1 text-primary">
                   <Star className="h-4 w-4 fill-current" />
-                  <span className="text-sm">{listing.sellerRating.toFixed(1)}</span>
+                  <span className="text-sm">{normalizedListing.sellerRating.toFixed(1)}</span>
                 </div>
               </div>
             </div>
@@ -459,9 +474,9 @@ export function TradeDetail({ listing }: TradeDetailProps) {
           </CardContent>
         </Card>
 
-        {canAccept && <AcceptOrderButton listingId={listing.id} onStatusChange={() => handleStatusChange("pending")} />}
+        {canAccept && <AcceptOrderButton listingId={normalizedListing.id} onStatusChangeAction={() => handleStatusChange("pending")} />}
 
-        {status === "pending" && userIsSelling && paymentConfirmed && (
+        {status === "pending" && userIsBuying && paymentConfirmed && (
           <Card>
             <CardHeader>
               <CardTitle>Release Crypto</CardTitle>
@@ -488,10 +503,10 @@ export function TradeDetail({ listing }: TradeDetailProps) {
 
         {showTradeActions && isOwner && (
           <ReleaseRefundButtons
-            tradeId={listing.id}
+            tradeId={normalizedListing.id}
             isSeller={isOwner}
-            onRelease={() => handleStatusChange("completed")}
-            onRefund={() => handleStatusChange("cancelled")}
+            onReleaseAction={() => handleStatusChange("completed")}
+            onRefundAction={() => handleStatusChange("cancelled")}
           />
         )}
 

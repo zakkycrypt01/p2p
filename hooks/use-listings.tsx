@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useWebSocket } from "./use-web-socket"
+import { useSuiWallet } from "./use-sui-wallet"
+import {useContract} from './useContract'
 
 interface Listing {
   id: string
@@ -27,6 +29,7 @@ interface ListingFilters {
 }
 
 export function useListings(defaultOrderType?: "buy" | "sell") {
+  
   const [listings, setListings] = useState<Listing[]>([])
   const [filters, setFilters] = useState<ListingFilters>({
     orderType: defaultOrderType,

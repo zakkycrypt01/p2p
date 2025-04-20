@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Search, ArrowUpDown, Eye, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import Link from "next/link"
+import { useContract } from "@/hooks/useContract"
 
 interface Order {
   id: string
@@ -29,9 +30,11 @@ interface Order {
 export default function MerchantOrdersPage() {
   const currentAccount = useCurrentAccount()
   const address = currentAccount?.address
+  const { getAllListings, getUserOrders } = useContract()
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
+  const [listings, setListings] = useState<any[]>([]) // Add state for listings
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("all")
 
@@ -40,7 +43,7 @@ export default function MerchantOrdersPage() {
       router.push("/")
       return
     }
-
+    // fetct listing and orders by passing in address
     // Mock orders - in a real app, this would fetch from an API
     const mockOrders: Order[] = [
       {
@@ -122,11 +125,11 @@ export default function MerchantOrdersPage() {
         updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
       },
     ]
-
+    
     setOrders(mockOrders)
     setFilteredOrders(mockOrders)
   }, [address, router])
-
+  
   useEffect(() => {
     // Filter orders based on search term and active tab
     let filtered = orders

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -16,14 +16,20 @@ import { useToast } from "@/components/ui/use-toast"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowUpRight, ArrowDownRight, AlertCircle } from "lucide-react"
+import { useContract } from "@/hooks/useContract"
+import { useSuiWallet } from "@/hooks/use-sui-wallet"
+
+
 
 // Mock data
 const tokens = [
-  { symbol: "SUI", name: "Sui" },
-  { symbol: "USDC", name: "USD Coin" },
-  { symbol: "ETH", name: "Ethereum" },
-  { symbol: "BTC", name: "Bitcoin" },
-]
+  { symbol: "SUI", name: "Sui", coinID: `0x2::sui::SUI` },
+  { symbol: "USDC", name: "USD Coin", coinID: '0xTODO::usdc::USDC' },
+  { symbol: "ETH", name: "Ethereum", coinID: '0xTODO::eth::ETH' },
+  { symbol: "USDT", name: "Tether", coinID: '0xTODO::usdt::USDT' },
+  { symbol: "BTC", name: "Bitcoin", coinID: '0xTODO::btc::BTC' },
+];
+
 
 const fiatCurrencies = ["USD", "EUR", "GBP", "JPY", "AUD"]
 
@@ -65,44 +71,88 @@ type SellFormValues = z.infer<typeof sellFormSchema>
 type BuyFormValues = z.infer<typeof buyFormSchema>
 
 export function NewListingForm() {
+  const coinObjectId = useSuiWallet()
   const currentAccount = useCurrentAccount()
+  const connected = useSuiWallet()
+  const {createListing} = useContract()
   const address = currentAccount?.address
+  
+  const [fetchedCoinObjectId, setFetchedCoinObjectId] = useState<string | null>(null);
+  
+  useEffect(() => {
+    let isMounted = true;
+    if (coinObjectId?.fetchCoinObjectId) {
+      coinObjectId.fetchCoinObjectId({ address: address! }).then((result) => {
+        if (isMounted) {
+          // console.log('coinObjectId :>> ', result || "No coinObjectId available");
+          setFetchedCoinObjectId(result);
+        }
+      }).catch((error) => {
+        if (isMounted) {
+          console.log('Error fetching coinObjectId:', error);
+        }
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [coinObjectId, address]);
+  const suiToken = tokens.find(token => token.symbol === "SUI");
+  if (suiToken) {
+    suiToken.coinID = fetchedCoinObjectId || suiToken.coinID;
+  }
   const router = useRouter()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [orderType, setOrderType] = useState<"buy" | "sell">("sell")
+  const [metadata, setMetadata] = useState<Array<{key: string, value: string}>>([
+    {key: 'description', value: ''},
+    {key: 'paymentMethods', value: ''},
+    {key: 'minAmount', value: ''},
+    {key: 'maxAmount', value: ''},
+  ]);
+  const addMetadataField = () => {
+    setMetadata([...metadata, {key: '', value: ''}])
+  }
+  const updateMetadata = (index: number, key: string, value: string) => {
+    const newMetadata = [...metadata];
+    newMetadata[index] = { ...newMetadata[index], [key]: value };
+    setMetadata(newMetadata);
+  };
+
+  
 
   const sellForm = useForm<SellFormValues>({
     resolver: zodResolver(sellFormSchema),
     defaultValues: {
       token: "",
-      amount: undefined,
-      price: undefined,
+      amount: 1,
+      price: 2.5,
       fiatCurrency: "USD",
       paymentMethods: [],
-      minAmount: undefined,
-      maxAmount: undefined,
-      paymentWindow: 30,
+      minAmount: 1.00,
+      maxAmount: 100.00,
+      paymentWindow: 86400,
       releaseTime: 15,
       description: "",
     },
   })
-
+  
   const buyForm = useForm<BuyFormValues>({
     resolver: zodResolver(buyFormSchema),
     defaultValues: {
       token: "",
-      amount: undefined,
-      price: undefined,
+      amount: 0.00,
+      price: 0.00,
       fiatCurrency: "USD",
       paymentMethods: [],
-      minAmount: undefined,
-      maxAmount: undefined,
+      minAmount: 0.00,
+      maxAmount: 0.00,
       paymentWindow: 30,
       description: "",
     },
   })
-
+  
   const onSubmitSell = async (values: SellFormValues) => {
     if (!address) {
       toast({
@@ -116,21 +166,45 @@ export function NewListingForm() {
     setIsSubmitting(true)
 
     try {
-      // This would call your Move module in production
-      console.log("Creating sell listing on-chain:", values)
-
-      // Simulate blockchain delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // This would post to your backend API in production
-      console.log("Posting listing metadata to API")
+      // Update metadata with form values before processing
+      const updatedMetadata = [
+        { key: 'description', value: values.description || '' },
+        { key: 'paymentMethods', value: values.paymentMethods.join(',') },
+        { key: 'minAmount', value: values.minAmount.toString() },
+        { key: 'maxAmount', value: values.maxAmount.toString() },
+      ];
+      
+      const metadataKeys = updatedMetadata.map((item) => item.key).filter(key => key.trim() !== '');
+      const metadataValues = updatedMetadata
+        .filter(item => item.key.trim() !== '')
+        .map((item) => item.value);
+      
+      const tokenDecimalPlaces = 9;
+      
+      const tokenAmount = BigInt(Math.floor(values.amount * (10 ** tokenDecimalPlaces)));
+      const price = BigInt(Math.round(values.price * 100));
+      
+      console.log("Creating sell listing with:", {
+        token: values.token,
+        amount: tokenAmount.toString(),
+        price: price.toString(),
+        expiry: values.paymentWindow,
+      });
+      
+      const result = await createListing({
+        token_coin: values.token,
+        token_amount: Number(tokenAmount),
+        price: Number(price),
+        expiry: values.paymentWindow,
+        metadataKeys,
+        metadataValues,
+      })
 
       toast({
         title: "Sell listing created successfully",
         description: "Your listing has been published to the order book",
       })
 
-      router.push("/dashboard")
     } catch (error) {
       console.error("Error creating listing:", error)
       toast({
@@ -140,6 +214,8 @@ export function NewListingForm() {
       })
     } finally {
       setIsSubmitting(false)
+      await new Promise((resolve) => setTimeout(resolve, 100000));
+      router.push("/dashboard");
     }
   }
 
@@ -156,13 +232,8 @@ export function NewListingForm() {
     setIsSubmitting(true)
 
     try {
-      // This would call your Move module in production
       console.log("Creating buy listing on-chain:", values)
-
-      // Simulate blockchain delay
       await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      // This would post to your backend API in production
       console.log("Posting listing metadata to API")
 
       toast({
@@ -170,7 +241,6 @@ export function NewListingForm() {
         description: "Your listing has been published to the order book",
       })
 
-      router.push("/dashboard")
     } catch (error) {
       console.error("Error creating listing:", error)
       toast({
@@ -180,6 +250,7 @@ export function NewListingForm() {
       })
     } finally {
       setIsSubmitting(false)
+      router.push("/dashboard")
     }
   }
 
@@ -239,7 +310,7 @@ export function NewListingForm() {
                           </FormControl>
                           <SelectContent>
                             {tokens.map((token) => (
-                              <SelectItem key={token.symbol} value={token.symbol}>
+                              <SelectItem key={token.coinID} value={token.coinID}>
                                 {token.name} ({token.symbol})
                               </SelectItem>
                             ))}
@@ -257,7 +328,7 @@ export function NewListingForm() {
                       <FormItem>
                         <FormLabel>Total Amount</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.0001" {...field} />
+                          <Input type="number" step=".1" {...field} />
                         </FormControl>
                         <FormDescription>Total amount of tokens to sell</FormDescription>
                         <FormMessage />
@@ -341,7 +412,7 @@ export function NewListingForm() {
                       <FormItem>
                         <FormLabel>Payment Window (minutes)</FormLabel>
                         <FormControl>
-                          <Input type="number" min="5" max="180" {...field} />
+                          <Input type="number" min="5" max="180000" {...field} />
                         </FormControl>
                         <FormDescription>Time buyer has to complete payment</FormDescription>
                         <FormMessage />

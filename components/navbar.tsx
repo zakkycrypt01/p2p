@@ -34,7 +34,7 @@ export function Navbar() {
         <div className="flex items-center gap-6">
           <Link href={address ? "/dashboard" : "/"} className="flex items-center gap-2 font-semibold">
             <Package2 className="h-6 w-6 text-primary" />
-            <span className="hidden sm:inline">P2P Exchange</span>
+            <span className="hidden sm:inline">SuiXchange</span>
           </Link>
 
           {/* Desktop Navigation */}
