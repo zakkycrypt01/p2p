@@ -1,52 +1,88 @@
-'use client'
+// Convert the listing detail page to a client component
+"use client"
 
 import { TradeDetail } from "@/components/trade/trade-detail"
-import { notFound, useRouter } from "next/navigation"
-import { useParams } from "next/navigation"
+import { notFound } from "next/navigation"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { ArrowLeft } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
 import { getListingsById } from "@/actions/getListingsbyId"
 
 export default function ListingPage() {
-  const params = useParams();
-  const id = params.id as string;
+  const params = useParams()
+  const [listing, setListing] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const [fetchedListings, setFetchedListings] = useState<any[]>([]);
-  const [listing, setListing] = useState<any>(null); 
-  const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
+  useEffect(() => {
+    async function fetchListing() {
+      try {
+        setIsLoading(true)
+        if (typeof params.id !== "string") {
+          throw new Error("Invalid listing ID")
+        }
+        const listing = await getListingsById(params.id)
 
+        if (!listing) {
+          throw new Error("Listing not found")
+        }
 
-useEffect(() => {
-  const loadListing = async () => {
-    setIsLoading(true);
-    try {
-      const listing = await getListingsById(id);
-      console.log('listing :>> ', listing);
-      setListing(listing); 
-    } catch (error) {
-      console.error('Error loading listing:', error);
-    } finally {
-      setIsLoading(false);
+        const processedListing = {
+          ...listing,
+          paymentMethods:
+            Array.isArray(listing.paymentMethod)
+              ? listing.paymentMethod
+              : typeof listing.paymentMethod === "string"
+              ? listing.paymentMethod.split(",").map((method: string) => method.trim())
+              : [],
+        }
+
+        setListing(processedListing)
+      } catch (error) {
+        console.error("Error fetching listing:", error)
+        setListing(null)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  };
 
-  if (id) loadListing();
-}, [id]);
-
-
+    fetchListing()
+  }, [params.id])
 
   if (isLoading) {
-    return <div className="container mx-auto py-8 px-4 max-w-4xl">Loading...</div>;
+    return (
+      <div className="container mx-auto py-8 px-4 max-w-4xl">
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" size="sm" asChild className="mr-4">
+            <Link href="/listings">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Listings
+            </Link>
+          </Button>
+          <h1 className="text-3xl font-bold">Listing Details</h1>
+        </div>
+        <div className="text-center">Loading...</div>
+      </div>
+    )
   }
 
   if (!listing) {
-    return <div className="container mx-auto py-8 px-4 max-w-4xl">Listing not found</div>;
+    notFound()
   }
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">Listing Details</h1>
+      <div className="flex items-center mb-6">
+        <Button variant="ghost" size="sm" asChild className="mr-4">
+          <Link href="/listings">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Listings
+          </Link>
+        </Button>
+        <h1 className="text-3xl font-bold">Listing Details</h1>
+      </div>
       <TradeDetail listing={listing} />
     </div>
-  );
+  )
 }

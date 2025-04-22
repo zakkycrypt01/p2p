@@ -9,8 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Eye } from "lucide-react"
+import {useContract } from "@/hooks/useContract"
 
-interface Trade {
+export interface Trade {
   id: string
   tokenSymbol: string
   amount: number
@@ -22,77 +23,52 @@ interface Trade {
   createdAt: string
 }
 
+const statusMapping: Record<number, "pending" | "completed" | "refunded" | "disputed"> = {
+  0: "pending",
+  1: "completed",
+  2: "refunded",
+  3: "disputed",
+};
+
+function mapOrderStatus(status: number): "pending" | "completed" | "refunded" | "disputed" {
+  return statusMapping[status] || "pending";
+}
+
 export function MyTrades() {
   const currentAccount = useCurrentAccount()
   const address = currentAccount?.address
   const [trades, setTrades] = useState<Trade[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  const {getAllOrders, markPaymentMade, getOrdersByBuyer} = useContract()
+
   useEffect(() => {
     if (!address) return
-
-    const fetchTrades = async () => {
-      setIsLoading(true)
+    const fetchOrders = async () => {
       try {
-        // This would be a real API call in production
-        // Simulating API response
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        setTrades([
-          {
-            id: "trade-1",
-            tokenSymbol: "SUI",
-            amount: 25,
-            price: 1.25,
-            fiatCurrency: "USD",
-            counterparty: "0xabc...def",
-            role: "seller",
-            status: "pending",
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: "trade-2",
-            tokenSymbol: "USDC",
-            amount: 100,
-            price: 1.0,
-            fiatCurrency: "USD",
-            counterparty: "0x123...456",
-            role: "buyer",
-            status: "completed",
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-          },
-          {
-            id: "trade-3",
-            tokenSymbol: "ETH",
-            amount: 0.1,
-            price: 3000,
-            fiatCurrency: "USD",
-            counterparty: "0x789...012",
-            role: "buyer",
-            status: "refunded",
-            createdAt: new Date(Date.now() - 172800000).toISOString(),
-          },
-          {
-            id: "trade-4",
-            tokenSymbol: "BTC",
-            amount: 0.01,
-            price: 50000,
-            fiatCurrency: "USD",
-            counterparty: "0xdef...789",
-            role: "seller",
-            status: "disputed",
-            createdAt: new Date(Date.now() - 259200000).toISOString(),
-          },
-        ])
+        const orders = await getOrdersByBuyer(address)
+        const tradesData = orders.map((order) => ({
+          id: order.id,
+          tokenSymbol: order.metadata?.tokenSymbol || "SUI",
+          amount: Number(order.tokenAmount) / 1e9,
+          price: Number(order.price) / 1e10, 
+          fiatCurrency: "USD",
+          counterparty: order.seller,
+          role: "buyer" as "buyer" | "seller",
+          status: mapOrderStatus(order.status),
+          createdAt: new Date(order.createdAt).toISOString(),
+        }))
+        console.log('tradeData :>> ', tradesData);
+        setTrades(tradesData)
       } catch (error) {
-        console.error("Failed to fetch trades:", error)
+        console.error("Failed to fetch orders:", error)
       } finally {
         setIsLoading(false)
       }
     }
-
-    fetchTrades()
-  }, [address])
+    
+    fetchOrders();
+  }, [address, getOrdersByBuyer]);
 
   if (!address) {
     return (

@@ -49,7 +49,7 @@ const disputeInfoReturn = bcs.struct('DisputeInfoReturn', {
 const OptionListingInfoReturn = bcs.option(listingInfoReturn);
 const OptionOrderInfoReturn = bcs.option(orderInfoReturn);
 const OptionDisputeInfoReturn = bcs.option(disputeInfoReturn);
-const PACKAGE_ADDRESS = '0x0821a5bf51104bc36366d923a85f3305e8ac8f4ebdde3508a41cf525d0e0af3a'; // Replace with your actual package address
+const PACKAGE_ADDRESS = '0x921cde254120512c5703884cf378c35a732b73e2da6eac1243529aeee293515b'; // Replace with your actual package address
 
 const gqlClient = new SuiGraphQLClient({
   url: 'https://sui-devnet.mystenlabs.com/graphql',
@@ -514,7 +514,7 @@ export function useContract() {
             typeArguments: ["0x2::sui::SUI"], // Add the type argument for CoinType
             arguments: [
                 tx.object(listingId),
-                tx.pure.u64(BigInt(tokenAmount)),
+                tx.pure.u64(tokenAmount),
                 tx.object(SUI_CLOCK_OBJECT_ID),
             ]
         });

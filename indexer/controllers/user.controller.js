@@ -36,7 +36,7 @@ class UserController {
                         status
                     } = item;
                     
-                    if (!id || !tokenSymbol || !amount || !price) {
+                    if (!id || !tokenSymbol || amount === undefined || amount === null || !price) {
                         return response.status(StatusCodes.BAD_REQUEST).json({
                             error: "Missing required fields in item",
                             item
@@ -98,7 +98,7 @@ class UserController {
                     status
                 } = listingData;
                 
-                if (!id || !tokenSymbol || !amount || !price) {
+                if (!id || !tokenSymbol || amount === undefined || amount === null || !price) {
                     return response.status(StatusCodes.BAD_REQUEST).json({
                         error: "Missing required fields"
                     });

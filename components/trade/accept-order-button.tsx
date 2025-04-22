@@ -49,7 +49,7 @@ export function AcceptOrderButton({ listingId, onStatusChangeAction }: AcceptOrd
 
     try {
       // This would call your Move module in production
-      console.log("Calling fill_order() on-chain:", { listingId, amount })
+      // console.log("Calling fill_order() on-chain:", { listingId, amount })
 
       // Simulate blockchain delay
       await new Promise((resolve) => setTimeout(resolve, 2000))
@@ -58,7 +58,7 @@ export function AcceptOrderButton({ listingId, onStatusChangeAction }: AcceptOrd
       const tx = await createOrderFromListing({ listingId, tokenAmount: token_amount })
       console.log("Transaction response:", tx)
       // This would post to your backend API in production
-      console.log("Posting to backend to mark trade as pending")
+      // console.log("Posting to backend to mark trade as pending")
 
       toast({
         title: "Order accepted",

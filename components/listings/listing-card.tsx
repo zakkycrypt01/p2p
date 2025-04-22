@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
+// Update the ListingCardProps interface to match the new data structure
 interface ListingCardProps {
   id: string
   tokenSymbol: string
@@ -13,10 +14,12 @@ interface ListingCardProps {
   amount: number
   price: number
   fiatCurrency: string
-  sellerRating: number
-  paymentMethods: string[]
+  sellerRating?: number
+  paymentMethod?: string | string[]
   orderType?: "buy" | "sell"
   isMerchant?: boolean
+  sellerAddress?: string
+  status?: string
 }
 
 export function ListingCard({
@@ -26,11 +29,20 @@ export function ListingCard({
   amount,
   price,
   fiatCurrency,
-  sellerRating,
-  paymentMethods,
+  sellerRating = 4.5,
+  paymentMethod = [],
   orderType = "sell",
   isMerchant = false,
+  status = "Active",
 }: ListingCardProps) {
+  // Convert paymentMethod to array if it's a string
+  const paymentMethods =
+    typeof paymentMethod === "string"
+      ? paymentMethod.split(",").map((method) => method.trim())
+      : Array.isArray(paymentMethod)
+        ? paymentMethod
+        : []
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-0">
@@ -65,6 +77,11 @@ export function ListingCard({
                   Merchant
                 </Badge>
               )}
+              {status && status !== "Active" && (
+                <Badge variant="outline" className="text-xs">
+                  {status}
+                </Badge>
+              )}
             </div>
           </div>
 
@@ -72,14 +89,14 @@ export function ListingCard({
             <div className="flex justify-between">
               <span className="text-muted-foreground">Amount</span>
               <span className="font-medium">
-                {amount.toFixed(4)} {tokenSymbol}
+                {typeof amount === "number" ? amount.toFixed(4) : amount} {tokenSymbol}
               </span>
             </div>
 
             <div className="flex justify-between">
               <span className="text-muted-foreground">Price</span>
               <span className="font-medium">
-                {price.toFixed(2)} {fiatCurrency}
+                {typeof price === "number" ? price.toFixed(2) : price} {fiatCurrency}
               </span>
             </div>
 
@@ -87,13 +104,13 @@ export function ListingCard({
               <span className="text-muted-foreground">Merchant Rating</span>
               <div className="flex items-center gap-1 text-primary">
                 <Star className="h-4 w-4 fill-current" />
-                <span className="text-sm">{sellerRating.toFixed(1)}</span>
+                <span className="text-sm">{sellerRating?.toFixed(1)}</span>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-1 mt-2">
-              {paymentMethods.map((method) => (
-                <Badge key={method} variant="outline" className="text-xs">
+              {paymentMethods.map((method, index) => (
+                <Badge key={index} variant="outline" className="text-xs">
                   {method}
                 </Badge>
               ))}
@@ -109,4 +126,3 @@ export function ListingCard({
     </Card>
   )
 }
-

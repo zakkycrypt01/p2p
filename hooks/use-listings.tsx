@@ -1,21 +1,37 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useWebSocket } from "./use-web-socket"
 import { useSuiWallet } from "./use-sui-wallet"
-import {useContract} from './useContract'
+import { useContract } from "./useContract"
+import { addListings } from "@/actions/addListings"
+import { getListings } from "@/actions/getListings"
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client"
 
 interface Listing {
   id: string
-  tokenSymbol: string
-  tokenIcon: string
-  amount: number
+  ownerAddress?: string
+  transactionDigest?: string
   price: number
-  fiatCurrency: string
-  sellerRating: number
-  paymentMethods: string[]
-  status: "open" | "pending" | "completed" | "cancelled"
-  createdAt: string
+  remainingAmount?: bigint
+  paymentMethod?: string[] // Changed from `paymentMethod` to `paymentMethods`
+  description?: string
+  amount?: number
+  minAmount?: number
+  maxAmount?: number
+  expiry?: number
+  status?: string
+  createdAt?: number | string // Allow both timestamp and ISO string
+  metadata?: Array<{
+    description?: string
+    paymentMethods?: string
+    minAmount?: number
+    maxAmount?: number
+  }>
+  tokenSymbol?: string
+  tokenIcon?: string
+  fiatCurrency?: string
+  sellerRating?: number
   orderType?: "buy" | "sell"
 }
 
@@ -29,175 +45,354 @@ interface ListingFilters {
 }
 
 export function useListings(defaultOrderType?: "buy" | "sell") {
-  
   const [listings, setListings] = useState<Listing[]>([])
+  const [fetchedListings, setFetchedListings] = useState<Listing[]>([]);
+  const [fetchedListingsFromDb, setFetchedListingsFromDb] = useState<any[]>([]);
+
   const [filters, setFilters] = useState<ListingFilters>({
     orderType: defaultOrderType,
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const { getAllListings } = useContract()
+  const { address } = useSuiWallet()
+  const fetchAttemptedRef = useRef(false)
+
+  useEffect(() => {
+    if (!fetchAttemptedRef.current && address) {
+      fetchAttemptedRef.current = true
+
+      const fetchListings = async () => {
+        try {
+          const rawListings = await getAllListings()
+          console.log('Raw listings:', rawListings)
+
+          const mappedListings: Listing[] = rawListings.map((listing: any) => {
+            const metadataObj = listing.metadata || {}
+            return {
+              id: listing.id || "",
+              ownerAddress: listing.seller || "",
+              transactionDigest: listing.transactionDigest,
+              price: Number(listing.price) || 0,
+              remainingAmount: listing.remainingAmount,
+              createdAt: listing.createdAt ? Number(listing.createdAt) : undefined,
+              expiry: typeof listing.expiry === "number" ? listing.expiry : undefined,
+              status: (() => {
+              switch (listing.status) {
+                case 0:
+                return "Active";
+                case 1:
+                return "Sold";
+                case 2:
+                return "Partially Sold";
+                case 3:
+                return "Canceled";
+                case 4:
+                return "Expired";
+                default:
+                return "Unknown";
+              }
+              })(),
+              description: metadataObj.description || "",
+              paymentMethod: metadataObj.paymentMethods || "",
+              minAmount: metadataObj.minAmount ? Number(metadataObj.minAmount) : undefined,
+              maxAmount: metadataObj.maxAmount ? Number(metadataObj.maxAmount) : undefined,
+              metadata: [
+              {
+                description: metadataObj.description,
+                paymentMethods: metadataObj.paymentMethods,
+                minAmount: metadataObj.minAmount ? Number(metadataObj.minAmount) : undefined,
+                maxAmount: metadataObj.maxAmount ? Number(metadataObj.maxAmount) : undefined,
+                createdAt: listing.createdAt ? Number(listing.createdAt) : undefined
+              }
+              ]
+            }
+          })
+
+          setFetchedListings(mappedListings)
+        } catch (err) {
+          console.error('Error fetching listings:', err)
+          setFetchedListings([])
+        }
+      }
+
+      fetchListings()
+    }
+  }, [address, getAllListings])
+
+   //fetch token symbol and icon from transactionDigest
+   const digest = fetchedListings.map((listing) => listing.transactionDigest);
+   const [tokenSymbol, setTokenSymbol] = useState<string[]>([]);
+   const [tokenIcon, setTokenIcon] = useState<string[]>([]);
+   async function fetchTokenDetails(digest: string) {
+     const client = new SuiClient({
+       url: getFullnodeUrl('devnet') // Consider making this configurable
+     });
+ 
+     try {
+       const tx = await client.getTransactionBlock({
+         digest,
+         options: {
+           showEvents: true,
+           showObjectChanges: true
+         },
+       });
+       
+       // console.log(`Transaction for ${digest}:`, tx);
+       const listingObjects = tx.objectChanges?.filter((change) => {
+         return change.type === "created" && 
+                'objectType' in change && 
+                change.objectType.includes("::marketplace::Listing<");
+       }) || [];
+       
+       // console.log("Found listing objects:", listingObjects);
+       if (listingObjects.length > 0) {
+         const objectWithType = listingObjects[0] as { objectType: string };
+         const match = objectWithType.objectType.match(/<(.+)>/);
+         if (match) {
+           const coinType = match[1];
+           // console.log(`Extracted coin type from listing: ${coinType}`);
+           
+           try {
+             const metadata = await client.getCoinMetadata({ coinType });
+             // console.log(`Metadata for ${coinType}:`, metadata);
+             
+             if (metadata) {
+               return {
+                 symbol: metadata.symbol || "",
+                 icon: metadata.iconUrl || "https://res.cloudinary.com/dh0hcpmzk/image/upload/v1744934236/sui_p6ug5f.png"
+               };
+             }
+           } catch (error) {
+             console.warn(`Failed to fetch metadata for coin type ${coinType}:`, error);
+           }
+         }
+       }
+       const coinObjects = tx.objectChanges?.filter((change) => {
+         return 'objectType' in change && 
+                change.objectType?.includes("::coin::Coin<");
+       }) || [];
+       
+       console.log("Found coin objects:", coinObjects);
+       
+       for (const obj of coinObjects) {
+         const objectWithType = obj as { objectType: string };
+         
+         const match = objectWithType.objectType.match(/<(.+)>/);
+         if (!match) continue;
+         
+         const coinType = match[1];
+         // console.log(`Extracted coin type from coin object: ${coinType}`);
+         
+         try {
+           const metadata = await client.getCoinMetadata({ coinType });
+           // console.log(`Metadata for ${coinType}:`, metadata);
+           
+           if (metadata) {
+             return {
+               symbol: metadata.symbol || "",
+               icon: metadata.iconUrl || "",
+               decimals: metadata.decimals || 0
+             };
+           }
+         } catch (error) {
+           console.warn(`Failed to fetch metadata for coin type ${coinType}:`, error);
+         }
+       }
+       
+       const listingEvents = tx.events?.filter(event => 
+         event.type.includes("::marketplace::ListingCreatedEvent")
+       ) || [];
+       
+       console.log("Listing events:", listingEvents);
+       
+       if (listingEvents.length > 0 && listingEvents[0].parsedJson) {
+         console.log("Listing event data:", listingEvents[0].parsedJson);
+       }
+       return null;
+     } catch (error) {
+       console.error(`Error processing transaction ${digest}:`, error);
+       return null;
+     }
+   }
+
+   useEffect(() => {
+    const fetchAndSetTokenDetails = async () => {
+      const tokenDetails = await Promise.all(
+        fetchedListings.map(async (listing) => {
+          const details = listing.transactionDigest 
+            ? await fetchTokenDetails(listing.transactionDigest) 
+            : null;
+            return {
+              id: listing.id,
+              tokenSymbol: details?.symbol || "Unknown",
+              tokenIcon: details?.icon || "https://res.cloudinary.com/dh0hcpmzk/image/upload/v1744934236/sui_p6ug5f.png",
+              amount: details?.decimals !== undefined 
+                ? Number(listing.remainingAmount) / (10 ** 9) 
+                : Number(listing.remainingAmount) / (10 ** 9),
+              price: listing.price / 100, 
+              fiatCurrency: 'USD',
+              paymentMethod: listing.paymentMethod || "Unknown",
+              createdAt: listing.createdAt 
+                ? new Date(Number(listing.createdAt) * 1000).toISOString()
+                : "Unknown",
+              orderType: "buy",
+              address: listing.ownerAddress,
+              sellerAddress: listing.ownerAddress,
+              sellerRating: 0,
+              description: listing.description || "No description provided",
+              minAmount: Array.isArray(listing.metadata) && listing.metadata[0]?.minAmount !== undefined 
+              ? listing.metadata[0].minAmount / (10 ** (details?.decimals || 0)) 
+              : undefined,
+              maxAmount: listing.maxAmount !== undefined 
+              ? listing.maxAmount / (10 ** (details?.decimals || 0)) 
+              : undefined,
+              expiry: listing.expiry? new Date(Number(listing.expiry) * 1000).toISOString()
+              : "Unknown",
+              status: listing.status || "Unknown",
+            };
+        })
+      );
+      setTokenSymbol(tokenDetails.map((detail) => detail.tokenSymbol));
+      setTokenIcon(tokenDetails.map((detail) => detail.tokenIcon));
+      // console.log('Fetched token details:', tokenDetails);
+    };
+    if (fetchedListings.length > 0) {
+      fetchAndSetTokenDetails();
+    }
+  }, [fetchedListings]);
+
+  const listingsAddedRef = useRef(false);
+
+  useEffect(() => {
+    const addListingsToDatabase = async () => {
+      if (listingsAddedRef.current) return; // Skip if already added
+      
+      try {
+        // console.log('fetchedListings :>> ', fetchedListings);
+        const tokenDetails = await Promise.all(
+          fetchedListings.map(async (listing) => {
+            const details = await fetchTokenDetails(listing.transactionDigest ?? "");
+            return {
+              id: listing.id,
+              tokenSymbol: details?.symbol || "Unknown",
+              tokenIcon: details?.icon || "https://res.cloudinary.com/dh0hcpmzk/image/upload/v1744934236/sui_p6ug5f.png",
+              amount: details?.decimals !== undefined 
+                ? Number(listing.remainingAmount) / (10 ** 9) 
+                : Number(listing.remainingAmount) / (10 ** 9),
+              price: listing.price / 100, 
+              fiatCurrency: 'USD',
+              paymentMethod: listing.paymentMethod || "Unknown",
+              createdAt: listing.createdAt 
+                ? new Date(Number(listing.createdAt) * 1000).toISOString()
+                : "Unknown",
+              orderType: "buy",
+              address: listing.ownerAddress,
+              sellerAddress: listing.ownerAddress,
+              sellerRating: 0,
+              description: listing.description || "No description provided",
+              minAmount: Array.isArray(listing.metadata) && listing.metadata[0]?.minAmount !== undefined 
+              ? listing.metadata[0].minAmount / (10 ** (details?.decimals || 0)) 
+              : undefined,
+              maxAmount: listing.maxAmount !== undefined 
+              ? listing.maxAmount / (10 ** (details?.decimals || 0)) 
+              : undefined,
+              expiry: listing.expiry? new Date(Number(listing.expiry) * 1000).toISOString()
+              : "Unknown",
+              status: listing.status || "Unknown",
+            };
+          })
+        );
+        await addListings(tokenDetails);
+        listingsAddedRef.current = true; 
+        // console.log("Listings added to the database successfully.");
+      } catch (error) {
+        console.error("Error adding listings to the database:", error);
+      }
+    };
+
+    if (fetchedListings.length > 0) {
+      addListingsToDatabase();
+    }
+  }, [fetchedListings, fetchTokenDetails]);
+
+  // get all listings
+  useEffect(() => {
+    const fetchListingsFromDb = async () => {
+      try {
+        const rawListings = await getListings();
+        // console.log("Fetched listings:", rawListings);
+        setFetchedListingsFromDb(rawListings);
+        console.log('fetchedListings from db :>> ', rawListings);
+      } catch (error) {
+        console.error("Error fetching listings:", error);
+        setFetchedListingsFromDb([]);
+      }
+    };
+    
+    fetchListingsFromDb();
+    
+  }, []);
 
   const fetchListings = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
 
     try {
-      // This would be a real API call in production
-      // Simulating API response
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Mock data
-      const mockListings: Listing[] = [
-        {
-          id: "listing-1",
-          tokenSymbol: "SUI",
-          tokenIcon: "/tokens/sui.png",
-          amount: 100,
-          price: 1.25,
-          fiatCurrency: "USD",
-          sellerRating: 4.8,
-          paymentMethods: ["Bank Transfer", "PayPal"],
-          status: "open",
-          createdAt: new Date().toISOString(),
-          orderType: "sell",
-        },
-        {
-          id: "listing-2",
-          tokenSymbol: "USDC",
-          tokenIcon: "/tokens/usdc.png",
-          amount: 500,
-          price: 1.0,
-          fiatCurrency: "USD",
-          sellerRating: 4.5,
-          paymentMethods: ["Bank Transfer", "Venmo"],
-          status: "open",
-          createdAt: new Date().toISOString(),
-          orderType: "sell",
-        },
-        {
-          id: "listing-3",
-          tokenSymbol: "USDT",
-          tokenIcon: "/tokens/usdt.png",
-          amount: 0.5,
-          price: 3000,
-          fiatCurrency: "USD",
-          sellerRating: 4.9,
-          paymentMethods: ["Bank Transfer", "Cash App"],
-          status: "open",
-          createdAt: new Date().toISOString(),
-          orderType: "buy",
-        },
-        {
-          id: "listing-4",
-          tokenSymbol: "BTC",
-          tokenIcon: "/tokens/btc.png",
-          amount: 0.01,
-          price: 50000,
-          fiatCurrency: "USD",
-          sellerRating: 5.0,
-          paymentMethods: ["Bank Transfer", "Zelle"],
-          status: "open",
-          createdAt: new Date().toISOString(),
-          orderType: "buy",
-        },
-        {
-          id: "listing-5",
-          tokenSymbol: "SUI",
-          tokenIcon: "/tokens/sui.png",
-          amount: 50,
-          price: 1.3,
-          fiatCurrency: "EUR",
-          sellerRating: 4.7,
-          paymentMethods: ["Bank Transfer", "Revolut"],
-          status: "open",
-          createdAt: new Date().toISOString(),
-          orderType: "sell",
-        },
-        {
-          id: "listing-6",
-          tokenSymbol: "USDC",
-          tokenIcon: "/tokens/usdc.png",
-          amount: 1000,
-          price: 0.95,
-          fiatCurrency: "EUR",
-          sellerRating: 4.6,
-          paymentMethods: ["Bank Transfer"],
-          status: "open",
-          createdAt: new Date().toISOString(),
-          orderType: "buy",
-        },
-        {
-          id: "listing-7",
-          tokenSymbol: "USDT",
-          tokenIcon: "/tokens/usdt.png",
-          amount: 0.2,
-          price: 2900,
-          fiatCurrency: "GBP",
-          sellerRating: 4.8,
-          paymentMethods: ["Bank Transfer", "PayPal"],
-          status: "open",
-          createdAt: new Date().toISOString(),
-          orderType: "sell",
-        },
-        {
-          id: "listing-8",
-          tokenSymbol: "BTC",
-          tokenIcon: "/tokens/btc.png",
-          amount: 0.005,
-          price: 49000,
-          fiatCurrency: "GBP",
-          sellerRating: 4.9,
-          paymentMethods: ["Bank Transfer", "Revolut"],
-          status: "open",
-          createdAt: new Date().toISOString(),
-          orderType: "buy",
-        },
-      ]
+      // Use fetchedListingsFromDb as the source of truth
+      let filteredListings = [...fetchedListingsFromDb];
 
       // Apply filters
-      let filteredListings = [...mockListings]
-
-      // Filter by order type first
       if (filters.orderType) {
-        filteredListings = filteredListings.filter((listing) => (listing.orderType || "sell") === filters.orderType)
+        filteredListings = filteredListings.filter(
+          (listing) => (listing.orderType || "sell") === filters.orderType
+        );
       }
 
       if (filters.token) {
-        filteredListings = filteredListings.filter((listing) => listing.tokenSymbol === filters.token)
+        filteredListings = filteredListings.filter(
+          (listing) => listing.tokenSymbol === filters.token
+        );
       }
 
       if (filters.fiatCurrency) {
-        filteredListings = filteredListings.filter((listing) => listing.fiatCurrency === filters.fiatCurrency)
+        filteredListings = filteredListings.filter(
+          (listing) => listing.fiatCurrency === filters.fiatCurrency
+        );
       }
 
       if (filters.minPrice !== undefined) {
-        filteredListings = filteredListings.filter((listing) => listing.price >= filters.minPrice!)
+        filteredListings = filteredListings.filter(
+          (listing) => listing.price >= filters.minPrice!
+        );
       }
 
       if (filters.maxPrice !== undefined) {
-        filteredListings = filteredListings.filter((listing) => listing.price <= filters.maxPrice!)
+        filteredListings = filteredListings.filter(
+          (listing) => listing.price <= filters.maxPrice!
+        );
       }
 
       if (filters.paymentMethods && filters.paymentMethods.length > 0) {
         filteredListings = filteredListings.filter((listing) =>
-          filters.paymentMethods!.some((method) => listing.paymentMethods.includes(method)),
-        )
+          filters.paymentMethods!.some((method) =>
+            listing.paymentMethod?.includes(method)
+          )
+        );
       }
 
-      setListings(filteredListings)
+      setListings(filteredListings);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error("Unknown error"))
+      setError(err instanceof Error ? err : new Error("Unknown error"));
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [filters])
+  }, [filters, fetchedListingsFromDb]);
 
-  // Initial fetch
   useEffect(() => {
     fetchListings()
   }, [fetchListings])
 
-  // WebSocket updates
   const { lastMessage } = useWebSocket("/ws/listings")
 
   useEffect(() => {
@@ -209,9 +404,15 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
       if (data.type === "new_listing") {
         setListings((prev) => [data.listing, ...prev])
       } else if (data.type === "update_listing") {
-        setListings((prev) => prev.map((listing) => (listing.id === data.listing.id ? data.listing : listing)))
+        setListings((prev) =>
+          prev.map((listing) =>
+            listing.id === data.listing.id ? data.listing : listing
+          )
+        )
       } else if (data.type === "remove_listing") {
-        setListings((prev) => prev.filter((listing) => listing.id !== data.listingId))
+        setListings((prev) =>
+          prev.filter((listing) => listing.id !== data.listingId)
+        )
       }
     } catch (err) {
       console.error("Failed to process WebSocket message", err)
