@@ -39,9 +39,15 @@ interface Order {
   releaseTime?: number
 }
 
-export default function OrderDetailPage({ params }: { params: { id: string } }) {
-  // Unwrap params using React.use()
-  const orderId = params.id
+interface OrderDetailPageProps {
+  params: Promise<{
+    id: string;
+  }>
+}
+
+export default function OrderDetailPage({ params }: OrderDetailPageProps) {
+  const { id } = use(params);
+  const orderId = id as string;
 
   const { address } = useSuiWallet()
   const router = useRouter()

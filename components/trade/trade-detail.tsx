@@ -64,7 +64,7 @@ export function TradeDetail({ listing }: TradeDetailProps) {
         ? "partially_sold"
         : status === "completed"
           ? "sold"
-          : status.toLowerCase()
+          : status.replace(/\s+/g, "_").toLowerCase(); // Replace spaces with underscores
 
   // Calculate available amount for partially sold listings
   const amount =
@@ -83,7 +83,10 @@ export function TradeDetail({ listing }: TradeDetailProps) {
   const isBuyer = address && address !== listing.sellerAddress
   const isVisitor = !address
 
-  const canCreateOrder = normalizedStatus === "active" && !!address && address !== listing.sellerAddress
+  const canCreateOrder = 
+    (normalizedStatus === "active" || normalizedStatus === "partially_sold") &&
+    !!address &&
+    address !== listing.sellerAddress;
 
   console.log({
     address,

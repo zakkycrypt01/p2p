@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useCallback } from "react"
 import { useSuiWallet } from "./use-sui-wallet"
+import { useContract } from "./useContract"
 
 export interface Order {
   id: string
@@ -19,8 +20,8 @@ export interface Order {
   expiresAt: string
   paymentMethods: string[]
   selectedPaymentMethod: string | null
-  orderType: "buy" | "sell" // buy from merchant or sell to merchant
-  paymentWindow: number // minutes
+  orderType: "buy" | "sell"
+  paymentWindow: number 
   paymentDetails: {
     [key: string]: {
       accountName?: string
@@ -34,45 +35,11 @@ export interface Order {
 
 export function useOrders() {
   const { address } = useSuiWallet()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { getOrderByOrderId, markPaymentMade } = useContract()
 
-  // Load orders from localStorage on component mount
-  useEffect(() => {
-    if (!address) return
-
-    const loadOrders = () => {
-      setIsLoading(true)
-      try {
-        const savedOrders = localStorage.getItem("mockOrders")
-        if (savedOrders) {
-          const parsedOrders = JSON.parse(savedOrders) as Order[]
-          // Only show orders related to the current user
-          const filteredOrders = parsedOrders.filter(
-            (order) => order.buyerAddress === address || order.merchantAddress === address,
-          )
-          setOrders(filteredOrders)
-        }
-      } catch (error) {
-        console.error("Error loading orders:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadOrders()
-  }, [address])
-
-  // Save orders to localStorage whenever they change
-  useEffect(() => {
-    if (orders.length > 0) {
-      localStorage.setItem("mockOrders", JSON.stringify(orders))
-    }
-  }, [orders])
-
-  // Create a new order
   const createOrder = useCallback(
     (
+      params: { id: string },
       listing: {
         id: string
         tokenSymbol: string
@@ -96,15 +63,9 @@ export function useOrders() {
       amount: number,
     ): Order => {
       if (!address) throw new Error("Wallet not connected")
-
-      // Generate a unique order ID
-      const orderId = `order-${Math.floor(Math.random() * 10000)}`
-
-      // Calculate expiration time (default to 30 minutes if not specified)
+      const { id: orderId } = params    // pull orderId from params.id
       const paymentWindow = listing.paymentWindow || 30
       const expiresAt = new Date(Date.now() + paymentWindow * 60 * 1000).toISOString()
-
-      // Create the new order
       const newOrder: Order = {
         id: orderId,
         listingId: listing.id,
@@ -123,88 +84,74 @@ export function useOrders() {
         selectedPaymentMethod: null,
         orderType: listing.orderType || "buy",
         paymentWindow,
-        paymentDetails: listing.paymentDetails || {
-          "bank transfer": {
-            accountName: "Merchant Bank Account",
-            accountNumber: "1234567890",
-            bankName: "Chase Bank",
-            instructions: "Please send payment to this account and include the trade ID",
-          },
-          paypal: {
-            accountName: "merchant@example.com",
-            instructions: "Send as Friends & Family to avoid fees",
-          },
-        },
+        paymentDetails: listing.paymentDetails || {},
       }
-
-      // Add the new order to the state
-      setOrders((prevOrders) => [...prevOrders, newOrder])
 
       return newOrder
     },
     [address],
   )
 
-  // Get a specific order by ID
   const getOrder = useCallback(
-    (orderId: string) => {
-      return orders.find((order) => order.id === orderId) || null
+    async (params: { id: string }) => {
+      const { id: orderId } = params;
+      
+      if (!orderId) {
+        console.error("Invalid order ID");
+        return null;
+      }
+      
+      try {
+        return await getOrderByOrderId(orderId);
+      } catch (error) {
+        console.error("Error fetching order:", error);
+        return null;
+      }
     },
-    [orders],
+    [getOrderByOrderId],
   )
 
-  // Update an order's status
-  const updateOrderStatus = useCallback((orderId: string, status: Order["status"], additionalData?: Partial<Order>) => {
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => (order.id === orderId ? { ...order, ...additionalData, status } : order)),
-    )
-  }, [])
-
-  // Mark payment as sent
   const markPaymentAsSent = useCallback(
     (orderId: string, paymentMethod: string) => {
-      updateOrderStatus(orderId, "payment_sent", { selectedPaymentMethod: paymentMethod })
+      console.log('orderId :>> ', orderId, 'paymentMethod :>> ', paymentMethod);
+      markPaymentMade(orderId);
+
     },
-    [updateOrderStatus],
-  )
+    [],
+  );
 
   // Mark order as completed (merchant releases funds)
   const completeOrder = useCallback(
     (orderId: string) => {
-      updateOrderStatus(orderId, "completed")
+      console.log('orderId :>> ', orderId);
     },
-    [updateOrderStatus],
+    [],
   )
 
   // Cancel an order
   const cancelOrder = useCallback(
     (orderId: string) => {
-      updateOrderStatus(orderId, "cancelled")
+      console.log('orderId :>> ', orderId);
     },
-    [updateOrderStatus],
+    [],
   )
 
   // Open a dispute
   const openDispute = useCallback(
     (orderId: string) => {
-      updateOrderStatus(orderId, "disputed")
+      console.log('orderId :>> ', orderId);
     },
-    [updateOrderStatus],
+    [],
   )
 
   // Upload payment proof
   const uploadPaymentProof = useCallback((orderId: string, proofUrl: string) => {
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => (order.id === orderId ? { ...order, paymentProofUrl: proofUrl } : order)),
-    )
+    console.log('orderId :>> ', orderId, 'proofUrl :>> ', proofUrl);
   }, [])
 
   return {
-    orders,
-    isLoading,
     createOrder,
     getOrder,
-    updateOrderStatus,
     markPaymentAsSent,
     completeOrder,
     cancelOrder,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useCurrentAccount } from "@mysten/dapp-kit"
+import { useSuiWallet } from "@/hooks/use-sui-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -17,124 +17,95 @@ interface Order {
   id: string
   tradeId: string
   tokenSymbol: string
-  amount: number
-  price: number
+  amount: bigint | number
+  price: bigint | number
   fiatCurrency: string
   counterpartyAddress: string
   orderType: "buy" | "sell"
   status: "pending_payment" | "payment_sent" | "payment_confirmed" | "completed" | "cancelled" | "disputed"
-  createdAt: string
-  updatedAt: string
+  createdAt: number | string
+  updatedAt: number | string
+}
+
+// Helper functions for formatting
+const formatTokenAmount = (amount: bigint | number): string => {
+  if (typeof amount === "bigint") {
+    return (Number(amount) / 1000000000).toString()
+  }
+  return (Number(amount) / 1000000000).toString()
+}
+
+const formatPrice = (price: bigint | number): string => {
+  if (typeof price === "bigint") {
+    return (Number(price) / 100000000000).toFixed(2)
+  }
+  return (Number(price) / 100000000000).toFixed(2)
 }
 
 export default function MerchantOrdersPage() {
-  const currentAccount = useCurrentAccount()
-  const address = currentAccount?.address
-  const { getAllListings, getUserOrders } = useContract()
+  const { address } = useSuiWallet()
+  const { getAllOrders, getOrdersBySeller } = useContract()
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
-  const [listings, setListings] = useState<any[]>([]) // Add state for listings
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("all")
+
+  const mapStatus = (status: number): Order["status"] => {
+    const statusMap: { [key: number]: Order["status"] } = {
+      0: "pending_payment",
+      1: "payment_sent",
+      2: "payment_confirmed",
+      3: "completed",
+      4: "cancelled",
+      5: "disputed",
+    }
+    return statusMap[status] || "pending_payment"
+  }
 
   useEffect(() => {
     if (!address) {
       router.push("/")
       return
     }
-    // fetct listing and orders by passing in address
-    // Mock orders - in a real app, this would fetch from an API
-    const mockOrders: Order[] = [
-      {
-        id: "order-1",
-        tradeId: "trade-1",
-        tokenSymbol: "SUI",
-        amount: 10,
-        price: 1.25,
-        fiatCurrency: "USD",
-        counterpartyAddress: "0xabc...def",
-        orderType: "buy", // Merchant buys
-        status: "pending_payment",
-        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
-        updatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      },
-      {
-        id: "order-2",
-        tradeId: "trade-2",
-        tokenSymbol: "USDC",
-        amount: 100,
-        price: 1.0,
-        fiatCurrency: "USD",
-        counterpartyAddress: "0x123...456",
-        orderType: "sell", // Merchant sells
-        status: "payment_sent",
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-        updatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      },
-      {
-        id: "order-3",
-        tradeId: "trade-3",
-        tokenSymbol: "ETH",
-        amount: 0.5,
-        price: 3000,
-        fiatCurrency: "USD",
-        counterpartyAddress: "0x789...012",
-        orderType: "buy", // Merchant buys
-        status: "payment_confirmed",
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
-        updatedAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-      },
-      {
-        id: "order-4",
-        tradeId: "trade-4",
-        tokenSymbol: "BTC",
-        amount: 0.01,
-        price: 50000,
-        fiatCurrency: "USD",
-        counterpartyAddress: "0xdef...789",
-        orderType: "sell", // Merchant sells
-        status: "completed",
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-        updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 23).toISOString(),
-      },
-      {
-        id: "order-5",
-        tradeId: "trade-5",
-        tokenSymbol: "SUI",
-        amount: 50,
-        price: 1.3,
-        fiatCurrency: "USD",
-        counterpartyAddress: "0xabc...123",
-        orderType: "buy", // Merchant buys
-        status: "cancelled",
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(), // 36 hours ago
-        updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 35).toISOString(),
-      },
-      {
-        id: "order-6",
-        tradeId: "trade-6",
-        tokenSymbol: "ETH",
-        amount: 0.2,
-        price: 3100,
-        fiatCurrency: "USD",
-        counterpartyAddress: "0x456...789",
-        orderType: "sell", // Merchant sells
-        status: "disputed",
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), // 2 days ago
-        updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-      },
-    ]
-    
-    setOrders(mockOrders)
-    setFilteredOrders(mockOrders)
-  }, [address, router])
-  
-  useEffect(() => {
-    // Filter orders based on search term and active tab
-    let filtered = orders
 
-    // Apply search filter
+    const loadOrders = async () => {
+      try {
+        const fetched = await getOrdersBySeller(address)
+        console.log("Fetched orders:", fetched)
+
+        const uiOrders: Order[] = fetched.map((o: any) => ({
+          id: o.id,
+          tradeId: o.listingId,
+          tokenSymbol: "SUI",
+          amount: o.tokenAmount,
+          price: o.price,
+          fiatCurrency: "USD",
+          counterpartyAddress: o.seller === address ? o.buyer : o.seller,
+          orderType: o.seller === address ? "sell" : "buy",
+          status: mapStatus(Number(o.status)),
+          createdAt: Number(o.createdAt) * 1000,
+          updatedAt: Number(o.createdAt) * 1000,
+        }))
+
+        uiOrders.sort((a, b) => {
+          const dateA = typeof a.createdAt === "number" ? a.createdAt : new Date(a.createdAt).getTime()
+          const dateB = typeof b.createdAt === "number" ? b.createdAt : new Date(b.createdAt).getTime()
+          return dateB - dateA
+        })
+
+        setOrders(uiOrders)
+        setFilteredOrders(uiOrders)
+      } catch (error) {
+        console.error("Error loading orders:", error)
+      }
+    }
+
+    loadOrders()
+  }, [address, router, getOrdersBySeller])
+
+  useEffect(() => {
+    let filtered = orders
     if (searchTerm) {
       filtered = filtered.filter(
         (order) =>
@@ -143,8 +114,6 @@ export default function MerchantOrdersPage() {
           order.counterpartyAddress.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     }
-
-    // Apply tab filter
     if (activeTab !== "all") {
       if (activeTab === "buy") {
         filtered = filtered.filter((order) => order.orderType === "buy")
@@ -155,11 +124,19 @@ export default function MerchantOrdersPage() {
       }
     }
 
+    // Maintain sorting by creation date (newest first)
+    filtered.sort((a, b) => {
+      const dateA = typeof a.createdAt === "number" ? a.createdAt : new Date(a.createdAt).getTime()
+      const dateB = typeof b.createdAt === "number" ? b.createdAt : new Date(b.createdAt).getTime()
+      return dateB - dateA
+    })
+
     setFilteredOrders(filtered)
   }, [orders, searchTerm, activeTab])
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString()
+  const formatDate = (timestamp: number | string) => {
+    const date = typeof timestamp === "number" ? new Date(timestamp) : new Date(timestamp)
+    return date.toLocaleString()
   }
 
   const getStatusBadge = (status: string) => {
@@ -253,15 +230,15 @@ export default function MerchantOrdersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{order.tokenSymbol}</TableCell>
-                      <TableCell>{order.amount}</TableCell>
+                      <TableCell>{formatTokenAmount(order.amount)}</TableCell>
                       <TableCell>
-                        {order.price} {order.fiatCurrency}
+                        {formatPrice(order.price)} {order.fiatCurrency}
                       </TableCell>
                       <TableCell>{getStatusBadge(order.status)}</TableCell>
                       <TableCell>{formatDate(order.createdAt)}</TableCell>
                       <TableCell className="text-right">
                         <Button asChild size="sm" variant="ghost">
-                          <Link href={`/merchant/orders/${order.id}`}>
+                          <Link href={`/orders/${order.id}`}>
                             <Eye className="h-4 w-4 mr-2" />
                             View
                           </Link>

@@ -119,14 +119,12 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
       fetchListings()
     }
   }, [address, getAllListings])
-
-   //fetch token symbol and icon from transactionDigest
    const digest = fetchedListings.map((listing) => listing.transactionDigest);
    const [tokenSymbol, setTokenSymbol] = useState<string[]>([]);
    const [tokenIcon, setTokenIcon] = useState<string[]>([]);
    async function fetchTokenDetails(digest: string) {
      const client = new SuiClient({
-       url: getFullnodeUrl('devnet') // Consider making this configurable
+       url: getFullnodeUrl('devnet') 
      });
  
      try {
@@ -137,26 +135,18 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
            showObjectChanges: true
          },
        });
-       
-       // console.log(`Transaction for ${digest}:`, tx);
        const listingObjects = tx.objectChanges?.filter((change) => {
          return change.type === "created" && 
                 'objectType' in change && 
                 change.objectType.includes("::marketplace::Listing<");
        }) || [];
-       
-       // console.log("Found listing objects:", listingObjects);
        if (listingObjects.length > 0) {
          const objectWithType = listingObjects[0] as { objectType: string };
          const match = objectWithType.objectType.match(/<(.+)>/);
          if (match) {
            const coinType = match[1];
-           // console.log(`Extracted coin type from listing: ${coinType}`);
-           
            try {
              const metadata = await client.getCoinMetadata({ coinType });
-             // console.log(`Metadata for ${coinType}:`, metadata);
-             
              if (metadata) {
                return {
                  symbol: metadata.symbol || "",
@@ -266,7 +256,7 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
 
   useEffect(() => {
     const addListingsToDatabase = async () => {
-      if (listingsAddedRef.current) return; // Skip if already added
+      if (listingsAddedRef.current) return; 
       
       try {
         // console.log('fetchedListings :>> ', fetchedListings);
@@ -339,10 +329,7 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
     setError(null);
 
     try {
-      // Use fetchedListingsFromDb as the source of truth
       let filteredListings = [...fetchedListingsFromDb];
-
-      // Apply filters
       if (filters.orderType) {
         filteredListings = filteredListings.filter(
           (listing) => (listing.orderType || "sell") === filters.orderType

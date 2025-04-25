@@ -96,6 +96,32 @@ const fetchListingsQuery = graphql(`
   }
 `);
 
+// Query to fetch order by ID
+const fetchOrderByIdQuery = graphql(`
+  query FetchOrderById($orderId: String!) {
+    objects(
+      filter: {
+        type: "${PACKAGE_ADDRESS}::marketplace::Order",
+        objectIds: [$orderId]
+      },
+      first: 1
+    ) {
+      nodes {
+        address
+        version
+        owner {
+          __typename
+          ... on AddressOwner { owner { address } }
+          ... on Shared { initialSharedVersion }
+        }
+        asMoveObject { contents { json } }
+        previousTransactionBlock { digest }
+        status
+      }
+    }
+  }
+`);
+
 async function getAllListings() {
   const result = await gqlClient.query({
     query: fetchListingsQuery,
@@ -194,7 +220,7 @@ const fetchOrdersQuery = graphql(`
       filter: {
         type: "${PACKAGE_ADDRESS}::marketplace::Order"
       },
-      first: 10
+      last: 10
     ) {
       nodes {
         address
@@ -333,6 +359,52 @@ async function getOrdersBySeller(sellerAddress: string) {
   return allOrders.filter(order => order.seller === sellerAddress);
 }
 
+// Function to get an order by orderId
+async function getOrderByOrderId(orderId: string): Promise<any | null> {
+  try {
+    const response = await gqlClient.query({
+      query: fetchOrderByIdQuery,
+      variables: { orderId }
+    });
+    const node = (response as any).data.objects.nodes[0];
+    if (!node) return null;
+
+    const json = node.asMoveObject.contents.json;
+    // parse metadata if present
+    const parsedMetadata: Record<string, string> = {};
+    if (Array.isArray(json.metadata)) {
+      for (const { key, value } of json.metadata) {
+        parsedMetadata[new TextDecoder().decode(new Uint8Array(key))] =
+          new TextDecoder().decode(new Uint8Array(value));
+      }
+    }
+
+    return {
+      id: node.address,
+      buyer: json.buyer,
+      seller: json.seller,
+      tokenAmount: BigInt(json.token_amount),
+      price: BigInt(json.price),
+      feeAmount: BigInt(json.fee_amount),
+      expiry: Number(json.expiry),
+      createdAt: Number(json.created_at),
+      status: json.status,
+      paymentMade: json.payment_made,
+      paymentReceived: json.payment_received,
+      listingId: json.listing_id,
+      metadata: parsedMetadata,
+      ownerAddress:
+        node.owner.__typename === "AddressOwner"
+          ? node.owner.owner?.address
+          : null,
+      transactionDigest: node.previousTransactionBlock?.digest
+    };
+  } catch (error) {
+    console.error("Error fetching order by ID:", error);
+    return null;
+  }
+}
+
 export function useContract() {
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
@@ -375,79 +447,75 @@ export function useContract() {
     metadataKeys = [], 
     metadataValues = []
   }: CreateListingParams): Promise<string | null> => {
-    const tx = new Transaction();
-
-    // First, verify ownership of the token_coin
-    try {
-      const objectData = await suiClient.getObject({
-        id: token_coin,
-        options: {
-          showOwner: true,
-        }
-      });
-      
-      // Check if the object exists and retrieve the owner
-      if (!objectData.data || !objectData.data.owner) {
-        console.error('Token coin object not found or has no owner data');
+    if (!currentAccount?.address) {
+        console.error("No connected wallet");
         return null;
-      }
-      
-      // For AddressOwner type, extract the address
-      if (typeof objectData.data.owner === 'object' && 'AddressOwner' in objectData.data.owner) {
-        const ownerAddress = objectData.data.owner.AddressOwner;
-        console.log(`Token is owned by: ${ownerAddress}`);
-        
-        // Verify that the current wallet is the owner
-        if (currentAccount?.address !== ownerAddress) {
-          console.error(`Wallet address (${currentAccount?.address}) does not match token owner (${ownerAddress})`);
-          return null;
-        }
-      } else {
-        console.error('Token is not owned by an address (could be shared or immutable)');
-        return null;
-      }
-    } catch (error) {
-      console.error('Error verifying token ownership:', error);
-      return null;
     }
 
-    // Split the coin to only use the exact amount needed
-    const [splitCoin] = tx.splitCoins(tx.object(token_coin), [tx.pure.u64(token_amount)]);
+    try {
+        // Check if the account has SUI to pay for gas
+        const coins = await suiClient.getCoins({
+            owner: currentAccount.address,
+            coinType: "0x2::sui::SUI"
+        });
+        if (!coins || coins.data.length === 0) {
+            throw new Error("Your wallet doesn't have any SUI tokens for gas payment. Please add some SUI to your wallet.");
+        }
 
-    // Encode metadata as arrays of Uint8Arrays
-    const encodedKeys = metadataKeys.map(key =>
-      new TextEncoder().encode(key)
-    );
-  
-    const encodedValues = metadataValues.map(value =>
-      new TextEncoder().encode(value)
-    );
-  
-    // Convert to arrays of arrays of numbers
-    const keyVectors = encodedKeys.map(k => Array.from(k));
-    const valueVectors = encodedValues.map(v => Array.from(v));
-  
-    // Serialize vector<vector<u8>> correctly
-    const keysVector = bcs.vector(bcs.vector(bcs.u8())).serialize(keyVectors);
-    const valuesVector = bcs.vector(bcs.vector(bcs.u8())).serialize(valueVectors);
-    
-    tx.moveCall({
-      target: `${MarketplacePackageId}::${MODULE_NAME}::create_listing`,
-      typeArguments: ['0x2::sui::SUI'],
-      arguments: [
-        tx.object(EscrowConfigObjectId),
-        tx.object(TokenRegistryObjectId),
-        splitCoin,
-        tx.pure.u64(token_amount),
-        tx.pure.u64(price),
-        tx.pure.u64(expiry),
-        tx.pure(keysVector),
-        tx.pure(valuesVector),
-        tx.object(SUI_CLOCK_OBJECT_ID),
-      ],
-    });
-  
-    return handleTransaction(tx);
+        const tx = new Transaction();
+
+        // Verify ownership of the token_coin
+        const objectData = await suiClient.getObject({
+            id: token_coin,
+            options: { showOwner: true }
+        });
+        if (!objectData.data || !objectData.data.owner) {
+            console.error('Token coin object not found or has no owner data');
+            return null;
+        }
+        if (typeof objectData.data.owner === 'object' && 'AddressOwner' in objectData.data.owner) {
+            const ownerAddress = objectData.data.owner.AddressOwner;
+            if (currentAccount?.address !== ownerAddress) {
+                console.error(`Wallet address (${currentAccount?.address}) does not match token owner (${ownerAddress})`);
+                return null;
+            }
+        } else {
+            console.error('Token is not owned by an address (could be shared or immutable)');
+            return null;
+        }
+
+        // Split the coin to only use the exact amount needed
+        const [splitCoin] = tx.splitCoins(tx.object(token_coin), [tx.pure.u64(token_amount)]);
+
+        // Encode metadata as arrays of Uint8Arrays
+        const encodedKeys = metadataKeys.map(key => new TextEncoder().encode(key));
+        const encodedValues = metadataValues.map(value => new TextEncoder().encode(value));
+        const keyVectors = encodedKeys.map(k => Array.from(k));
+        const valueVectors = encodedValues.map(v => Array.from(v));
+        const keysVector = bcs.vector(bcs.vector(bcs.u8())).serialize(keyVectors);
+        const valuesVector = bcs.vector(bcs.vector(bcs.u8())).serialize(valueVectors);
+
+        tx.moveCall({
+            target: `${MarketplacePackageId}::${MODULE_NAME}::create_listing`,
+            typeArguments: ['0x2::sui::SUI'],
+            arguments: [
+                tx.object(EscrowConfigObjectId),
+                tx.object(TokenRegistryObjectId),
+                splitCoin,
+                tx.pure.u64(token_amount),
+                tx.pure.u64(price),
+                tx.pure.u64(expiry),
+                tx.pure(keysVector),
+                tx.pure(valuesVector),
+                tx.object(SUI_CLOCK_OBJECT_ID),
+            ],
+        });
+
+        return handleTransaction(tx);
+    } catch (error) {
+        console.error("Error creating listing:", error);
+        return null;
+    }
   };
 
   // Cancel a listing
@@ -488,49 +556,46 @@ export function useContract() {
   const createOrderFromListing = async ({ 
     listingId, 
     tokenAmount 
-}: CreateOrderParams): Promise<string | null> => {
+    }: CreateOrderParams): Promise<Transaction> => {
     if (!currentAccount?.address) {
-        console.error("No connected wallet");
-        return null;
+      throw new Error("No connected wallet");
     }
-
-    try {
-        // First check if the account has SUI to pay for gas
-        const coins = await suiClient.getCoins({
-            owner: currentAccount.address,
-            coinType: "0x2::sui::SUI"
-        });
-        
-        if (!coins || coins.data.length === 0) {
-            throw new Error("Your wallet doesn't have any SUI tokens for gas payment. Please add some SUI to your wallet.");
-        }
-
-        // Create the transaction with the gas coin already set
-        const tx = new Transaction();
-        
-        // Add the moveCall to create the order
-        tx.moveCall({
-            target: `${MarketplacePackageId}::${MODULE_NAME}::create_order_from_listing`,
-            typeArguments: ["0x2::sui::SUI"], // Add the type argument for CoinType
-            arguments: [
-                tx.object(listingId),
-                tx.pure.u64(tokenAmount),
-                tx.object(SUI_CLOCK_OBJECT_ID),
-            ]
-        });
-
-        return handleTransaction(tx);
-    } catch (error) {
-        console.error("Error creating order:", error);
-        throw error;
+  
+    // First check if the account has SUI to pay for gas
+    const coins = await suiClient.getCoins({
+      owner: currentAccount.address,
+      coinType: "0x2::sui::SUI"
+    });
+    
+    if (!coins || coins.data.length === 0) {
+      throw new Error("Your wallet doesn't have any SUI tokens for gas payment. Please add some SUI to your wallet.");
     }
+  
+    // Create the transaction with the gas coin already set
+    const tx = new Transaction();
+    
+    // Add the moveCall to create the order
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::create_order_from_listing`,
+      typeArguments: ["0x2::sui::SUI"],
+      arguments: [
+        tx.object(listingId),
+        tx.pure.u64(tokenAmount),
+        tx.object(SUI_CLOCK_OBJECT_ID),
+      ]
+    });
+  
+    return tx;
   };
   // Mark payment made (by buyer)
   const markPaymentMade = async (orderId: string): Promise<string | null> => {
+   
+    
     const tx = new Transaction();
     
     tx.moveCall({
       target: `${MarketplacePackageId}::${MODULE_NAME}::mark_payment_made`,
+      typeArguments: ['0x2::sui::SUI'],
       arguments: [
         tx.object(orderId),
       ]
@@ -1083,5 +1148,6 @@ export function useContract() {
     getAllOrders,
     getOrdersByBuyer,
     getOrdersBySeller,
+    getOrderByOrderId
   };
 }

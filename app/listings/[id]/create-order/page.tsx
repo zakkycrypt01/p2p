@@ -17,18 +17,22 @@ import Image from "next/image"
 import { useOrders } from "@/hooks/use-orders"
 import { getListingsById } from "@/actions/getListingsbyId"
 import { useContract } from "@/hooks/useContract"
+import { useSubmitTransaction } from "@/hooks/useSubmitTransaction"
+import { useSuiClient } from "@mysten/dapp-kit"
 
 export default function CreateOrderPage() {
   const params = useParams()
   const { address } = useSuiWallet()
+  const { executeTransaction } = useSubmitTransaction()
   const router = useRouter()
   const { toast } = useToast()
   const { createOrder } = useOrders()
-  const { createOrderFromListing } = useContract() // Move hook call here
+  const { createOrderFromListing } = useContract()
+  const suiClient = useSuiClient()
   const [listing, setListing] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [amount, setAmount] = useState("")
-  const [sliderValue, setSliderValue] = useState(100) // Default to 100% of available amount
+  const [sliderValue, setSliderValue] = useState(100)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
@@ -77,7 +81,6 @@ export default function CreateOrderPage() {
     }
   }, [address, params.id, router, toast])
 
-  // Update amount when slider changes
   const handleSliderChange = (value: number[]) => {
     const percentage = value[0]
     setSliderValue(percentage)
@@ -88,7 +91,6 @@ export default function CreateOrderPage() {
     }
   }
 
-  // Update slider when amount changes manually
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newAmount = e.target.value
     setAmount(newAmount)
@@ -105,75 +107,106 @@ export default function CreateOrderPage() {
         title: "Wallet not connected",
         description: "Please connect your wallet to create an order",
         variant: "destructive",
-      })
-      return
+      });
+      return null;
     }
-
+    
     if (!amount || Number.parseFloat(amount) <= 0) {
       toast({
         title: "Invalid amount",
         description: "Please enter a valid amount",
         variant: "destructive",
-      })
-      return
+      });
+      return null;
     }
-
-    if (listing.minAmount && Number.parseFloat(amount) < listing.minAmount) {
-      toast({
-        title: "Amount too low",
-        description: `The minimum amount is ${listing.minAmount} ${listing.tokenSymbol}`,
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (listing.maxAmount && Number.parseFloat(amount) > listing.maxAmount) {
-      toast({
-        title: "Amount too high",
-        description: `The maximum amount is ${listing.maxAmount} ${listing.tokenSymbol}`,
-        variant: "destructive",
-      })
-      return
-    }
-
+    
     if (Number.parseFloat(amount) > listing.amount) {
       toast({
         title: "Amount exceeds available",
         description: `The maximum available amount is ${listing.amount} ${listing.tokenSymbol}`,
         variant: "destructive",
-      })
-      return
+      });
+      return null;
     }
-
-    setIsSubmitting(true)
-
+    
+    setIsSubmitting(true);
+    
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000)) 
-      console.log('amount :>> ', amount);
-      const token_amount = Number.parseFloat(amount) * Math.pow(10, 9) // Convert to MIST (1 SUI = 10^9 MIST)
-      console.log('token_amount :>> ', token_amount);
+      const token_amount = Number.parseFloat(amount) * Math.pow(10, 9);
+      
       if (typeof params.id !== "string") {
         throw new Error("Invalid listing ID");
       }
-      const tx = await createOrderFromListing({listingId: params.id, tokenAmount: token_amount})
-      toast({
-        title: "Order created",
-        description: "You have successfully created an order with this merchant",
-      })
-
-      // Redirect to the order detail page
-      // router.push(`/orders/${newOrder.id}`)
+      
+      const transactionBlock = await createOrderFromListing({
+        listingId: params.id,
+        tokenAmount: token_amount,
+      });
+      
+      const txDigest = await executeTransaction(transactionBlock, {
+        successMessage: "Order created successfully",
+        errorMessage: "Failed to create Order",
+        loadingMessage: "Creating Order",
+        onSuccess: () => {
+          console.log("Order created successfully");
+        },
+      });
+      
+      if (txDigest) {
+        console.log("Transaction digest:", txDigest);
+        try {
+          const txData = await suiClient.getTransactionBlock({
+            digest: txDigest,
+            options: { showEvents: true }
+          });
+          
+          if (txData.events) {
+            const orderCreatedEvent = txData.events.find(
+              event => event.type.includes("::marketplace::OrderCreatedEvent")
+            );
+            
+            if (orderCreatedEvent && orderCreatedEvent.parsedJson) {
+              const orderId = (orderCreatedEvent.parsedJson as { order_id: string }).order_id;
+              console.log("Order created with ID:", orderId);
+              router.push(`/orders/${orderId}`);
+              return txDigest;
+            }
+          }
+          
+          // If we couldn't find the order ID from events
+          toast({
+            title: "Order created",
+            description: "Your order was created successfully, but we couldn't retrieve the order details.",
+          });
+          
+          // Navigate to orders page as fallback
+          // router.push('/orders');
+          return txDigest;
+        } catch (error) {
+          console.error("Error fetching transaction events:", error);
+          // Still consider this a success as the transaction went through
+          // router.push('/orders');
+          return txDigest;
+        }
+      } else {
+        console.log("Transaction result is null.");
+        return null;
+      }
     } catch (error) {
-      console.error("Error creating order:", error)
+      console.error("Error creating order:", error);
       toast({
         title: "Failed to create order",
-        description: "There was an error creating this order. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "There was an error creating this order. Please try again.",
         variant: "destructive",
-      })
+      });
+      return null;
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   if (isLoading || !listing) {
     return (
