@@ -69,7 +69,7 @@ export function NavigationMenu({ address, onClose }: NavigationMenuProps) {
               </Link>
             </Button>
             <Button asChild variant="ghost" className="w-full justify-start" onClick={handleNavigation}>
-              <Link href="/merchant/orders">
+              <Link href="/merchant/order">
                 <ShoppingCart className="h-5 w-5 mr-2" />
                 Manage Orders
               </Link>

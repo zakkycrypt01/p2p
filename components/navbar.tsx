@@ -47,8 +47,8 @@ export function Navbar() {
                 Order Book
               </Link>
               <Link
-                href="/merchant/orders"
-                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/merchant/orders" ? "text-primary" : "text-foreground/60"}`}
+                href="/merchant/order"
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/merchant/order" ? "text-primary" : "text-foreground/60"}`}
               >
                 Manage Orders
               </Link>
@@ -106,7 +106,7 @@ export function Navbar() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/merchant/orders">
+                    <Link href="/merchant/order">
                       <ShoppingCart className="mr-2 h-4 w-4" />
                       <span>Manage Orders</span>
                     </Link>

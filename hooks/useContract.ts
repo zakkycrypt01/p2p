@@ -49,7 +49,7 @@ const disputeInfoReturn = bcs.struct('DisputeInfoReturn', {
 const OptionListingInfoReturn = bcs.option(listingInfoReturn);
 const OptionOrderInfoReturn = bcs.option(orderInfoReturn);
 const OptionDisputeInfoReturn = bcs.option(disputeInfoReturn);
-const PACKAGE_ADDRESS = '0x921cde254120512c5703884cf378c35a732b73e2da6eac1243529aeee293515b'; // Replace with your actual package address
+const PACKAGE_ADDRESS = '0x91b726490989f4b3ea355619a913c33ce88dc17dbd38288ac64fd280be811322'; // Replace with your actual package address
 
 const gqlClient = new SuiGraphQLClient({
   url: 'https://sui-devnet.mystenlabs.com/graphql',
@@ -610,6 +610,7 @@ export function useContract() {
     
     tx.moveCall({
       target: `${MarketplacePackageId}::${MODULE_NAME}::mark_payment_received`,
+      typeArguments: ['0x2::sui::SUI'],
       arguments: [
         tx.object(EscrowConfigObjectId),
         tx.object(orderId),

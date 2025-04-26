@@ -46,7 +46,7 @@ export function NotificationDropdown() {
         message: "A user has initiated an order for 10 SUI at 1.25 USD",
         timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
         read: false,
-        actionUrl: "/merchant/orders/order-1",
+        actionUrl: "//merchant/order/order-1",
         tradeId: "order-1",
       },
       {
@@ -56,7 +56,7 @@ export function NotificationDropdown() {
         message: "User has marked payment as sent for order #order-2",
         timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
         read: false,
-        actionUrl: "/merchant/orders/order-2",
+        actionUrl: "//merchant/order/order-2",
         tradeId: "order-2",
       },
       {
@@ -66,7 +66,7 @@ export function NotificationDropdown() {
         message: "Order #order-3 has been completed successfully",
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
         read: true,
-        actionUrl: "/merchant/orders/order-3",
+        actionUrl: "//merchant/order/order-3",
         tradeId: "order-3",
       },
       {

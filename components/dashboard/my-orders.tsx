@@ -56,7 +56,8 @@ export function MyOrders() {
       setIsLoading(true)
       try {
         // Fetch orders where the current user is the buyer
-        const fetchedOrders = await getOrdersByBuyer(address)
+        // ensure we always have an array back
+        const fetchedOrders = (await getOrdersByBuyer(address)) || []
 
         // Transform the orders for UI display
         const transformedOrders = fetchedOrders.map((order: any) => ({
@@ -109,8 +110,12 @@ export function MyOrders() {
     fetchOrders()
   }, [address, getOrdersByBuyer])
 
-  // Filter orders based on active tab
-  const filteredOrders = activeTab === "all" ? orders : orders.filter((order) => order.status === activeTab)
+  // always an array
+  const filteredOrders: typeof orders = Array.isArray(orders)
+    ? activeTab === "all"
+      ? orders
+      : orders.filter((order) => order.status === activeTab)
+    : []
 
   if (!address) {
     return (

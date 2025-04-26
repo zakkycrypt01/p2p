@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Eye, Plus } from "lucide-react"
+import { useContract } from "@/hooks/useContract"
 
 interface Listing {
   id: string
@@ -25,6 +26,7 @@ export function MyListings() {
   const address = currentAccount?.address
   const [listings, setListings] = useState<Listing[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { getListingsBySeller } = useContract()
 
   useEffect(() => {
     if (!address) return
@@ -32,48 +34,27 @@ export function MyListings() {
     const fetchListings = async () => {
       setIsLoading(true)
       try {
-        // This would be a real API call in production
-        // Simulating API response
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        setListings([
-          {
-            id: "listing-1",
-            tokenSymbol: "SUI",
-            amount: 100,
-            price: 1.25,
-            fiatCurrency: "USD",
-            status: "open",
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: "listing-2",
-            tokenSymbol: "USDC",
-            amount: 500,
-            price: 1.0,
-            fiatCurrency: "USD",
-            status: "pending",
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-          },
-          {
-            id: "listing-3",
-            tokenSymbol: "ETH",
-            amount: 0.5,
-            price: 3000,
-            fiatCurrency: "USD",
-            status: "completed",
-            createdAt: new Date(Date.now() - 172800000).toISOString(),
-          },
-          {
-            id: "listing-4",
-            tokenSymbol: "SUI",
-            amount: 50,
-            price: 1.3,
-            fiatCurrency: "USD",
-            status: "cancelled",
-            createdAt: new Date(Date.now() - 259200000).toISOString(),
-          },
-        ])
+        // fetch raw on‐chain structs
+        const raw = await getListingsBySeller(address)
+        console.log('raw :>> ', raw);
+        const formatted: Listing[] = raw.map((l) => ({
+          id: l.id,
+          tokenSymbol: l.metadata.symbol ?? "",
+          amount: Number(l.remainingAmount),
+          price: Number(l.price),
+          fiatCurrency: l.metadata.fiatCurrency ?? "USD",
+          status:
+            l.status === 0
+              ? "open"
+              : l.status === 1
+              ? "pending"
+              : l.status === 2
+              ? "completed"
+              : "cancelled",
+          // convert timestamp to ISO string (or .toLocaleDateString())
+          createdAt: new Date(l.createdAt * 1000).toISOString(),
+        }))
+        setListings(formatted)
       } catch (error) {
         console.error("Failed to fetch listings:", error)
       } finally {

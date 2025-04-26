@@ -30,7 +30,7 @@ export default function NotificationsPage() {
         message: "A user has initiated an order for 10 SUI at 1.25 USD",
         timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
         read: false,
-        actionUrl: "/merchant/orders/order-1",
+        actionUrl: "//merchant/order/order-1",
         tradeId: "order-1",
       },
       {
@@ -40,7 +40,7 @@ export default function NotificationsPage() {
         message: "User has marked payment as sent for order #order-2",
         timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
         read: false,
-        actionUrl: "/merchant/orders/order-2",
+        actionUrl: "//merchant/order/order-2",
         tradeId: "order-2",
       },
       {
@@ -50,7 +50,7 @@ export default function NotificationsPage() {
         message: "Order #order-3 has been completed successfully",
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
         read: true,
-        actionUrl: "/merchant/orders/order-3",
+        actionUrl: "//merchant/order/order-3",
         tradeId: "order-3",
       },
       {
@@ -68,7 +68,7 @@ export default function NotificationsPage() {
         message: "Payment for order #order-5 has been marked as received",
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
         read: true,
-        actionUrl: "/merchant/orders/order-5",
+        actionUrl: "//merchant/order/order-5",
         tradeId: "order-5",
       },
       {
@@ -78,7 +78,7 @@ export default function NotificationsPage() {
         message: "Order #order-6 has been cancelled",
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
         read: true,
-        actionUrl: "/merchant/orders/order-6",
+        actionUrl: "//merchant/order/order-6",
         tradeId: "order-6",
       },
     ]

@@ -577,7 +577,7 @@ module escrow::marketplace {
             expiry: order.expiry,
         });
 
-        transfer::transfer(order, buyer);
+        transfer::share_object(order);
     }
 
     /// Buyer marks payment as made (off-chain transaction)

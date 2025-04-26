@@ -3,13 +3,13 @@ import { useSuiClientContext } from "@mysten/dapp-kit";
 const NETWORK_CONFIG = {
   devnet: {
     MarketplacePackageId:
-    "0x921cde254120512c5703884cf378c35a732b73e2da6eac1243529aeee293515b",
+    "0x91b726490989f4b3ea355619a913c33ce88dc17dbd38288ac64fd280be811322",
     EscrowConfigObjectId:
-    "0xbcda594728ed973a5bf91b5494965bea5db82394613dec975de456fc4f619959",
+    "0x19115ff0160789ba0f5bd7dcc112c9ea4add80f0584f6bba8396fa5b3541e4fa",
     TokenRegistryObjectId:
-    "0x660f7be3cacbc126ec23a1213f44e59886a1a9c3dcc34b3c133d23023bdf1321",
+    "0x2c0922d6ab6cb9e838e5eab33fdb41c5f0025a7b0da115b129fbaeb7ab373528",
     AdminCapObjectId:
-    "0xca549e80cb18f8bc51c50bcac0bb78c51bc14e224ff4aa99891f7f7bed0fd148"
+    "0x3ccb219cae6f9602326a06d3ee639e86dda905ed598b72409923603b73610532"
   },
   mainnet: {
     MarketplacePackageId: "0x0TODO", // Replace with mainnet package ID

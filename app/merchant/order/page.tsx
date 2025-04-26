@@ -85,12 +85,16 @@ export default function MerchantOrdersPage() {
           orderType: o.seller === address ? "sell" : "buy",
           status: mapStatus(Number(o.status)),
           createdAt: Number(o.createdAt) * 1000,
-          updatedAt: Number(o.createdAt) * 1000,
+          updatedAt: Number(o.updatedAt) * 1000,
         }))
 
         uiOrders.sort((a, b) => {
-          const dateA = typeof a.createdAt === "number" ? a.createdAt : new Date(a.createdAt).getTime()
-          const dateB = typeof b.createdAt === "number" ? b.createdAt : new Date(b.createdAt).getTime()
+          const dateA = typeof a.createdAt === "number"
+            ? a.createdAt
+            : new Date(a.createdAt).getTime()
+          const dateB = typeof b.createdAt === "number"
+            ? b.createdAt
+            : new Date(b.createdAt).getTime()
           return dateB - dateA
         })
 
@@ -238,7 +242,7 @@ export default function MerchantOrdersPage() {
                       <TableCell>{formatDate(order.createdAt)}</TableCell>
                       <TableCell className="text-right">
                         <Button asChild size="sm" variant="ghost">
-                          <Link href={`/orders/${order.id}`}>
+                          <Link href={`/merchant/order/${order.id}`}>
                             <Eye className="h-4 w-4 mr-2" />
                             View
                           </Link>
