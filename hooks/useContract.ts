@@ -5,7 +5,7 @@ import { useSubmitTransaction } from "./useSubmitTransaction";
 import { MODULE_NAME } from "@/utils/constant";
 import { bcs } from "@mysten/sui/bcs";
 import { SUI_CLOCK_OBJECT_ID } from "@mysten/sui/utils";
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { SuiGraphQLClient } from '@mysten/sui/graphql';
 import { graphql } from '@mysten/sui/graphql/schemas/latest';
 
@@ -414,17 +414,60 @@ export function useContract() {
     EscrowConfigObjectId, 
     TokenRegistryObjectId, 
   } = useNetworkVariables();
+  const [isDrippingGas, setIsDrippingGas] = useState(false);
 
-  // Add a utility function to handle the return type of executeTransaction
-  const handleTransaction = async (transaction: Transaction): Promise<string | null> => {
-    // Set a fixed gas budget that should cover most operations
-    transaction.setGasBudget(BigInt(50000000)); // 0.05 SUI
-    
+  // Drip a small amount of SUI to the user
+  const dripGas = useCallback(async (recipient: string): Promise<string | null> => {
+    setIsDrippingGas(true);
     try {
-      const result = await executeTransaction(transaction);
-      return result || null;
-    } catch (error) {
-      console.error('Transaction error:', error);
+      const res = await fetch('/api/drip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient }),
+      });
+      const data = await res.json();
+      setIsDrippingGas(false);
+      if (!res.ok) throw new Error(data.error || 'Drip failed');
+      return data.txDigest;
+    } catch (e: any) {
+      console.error('Gas drip error:', e);
+      setIsDrippingGas(false);
+      return null;
+    }
+  }, []);
+
+  // Wrapped transaction submit to auto‐drip on low gas
+  const handleTransaction = async (transaction: Transaction): Promise<string | null> => {
+    if (!currentAccount?.address) return null;
+
+    // === ensure user has at least 0.02 SUI ===
+    const MIN_GAS = BigInt(50000000); // 0.02 SUI in mist
+    const userCoins = await suiClient.getCoins({
+      owner: currentAccount.address,
+      coinType: "0x2::sui::SUI",
+    });
+    const userBalance = userCoins.data.reduce((sum, c) => sum + BigInt(c.balance), BigInt(0));
+    if (userBalance < MIN_GAS) {
+      console.log('User balance below threshold, dripping gas…');
+      await dripGas(currentAccount.address);
+    }
+
+    // set a standard gas budget
+    transaction.setGasBudget(BigInt(50000000));
+
+    try {
+      return (await executeTransaction(transaction)) || null;
+    } catch (err: any) {
+      const msg = err.message || "";
+      // detect insufficient‐gas on retry
+      if (msg.includes("No valid gas coins") || msg.includes("insufficient balance")) {
+        console.log("Still no gas after pre‐drip, retrying drip…");
+        const digest = await dripGas(currentAccount.address);
+        if (!digest) return null;
+        console.log("Retrying transaction…");
+        return (await executeTransaction(transaction)) || null;
+      }
+      console.error("Transaction error:", err);
       return null;
     }
   };
@@ -456,10 +499,16 @@ export function useContract() {
         // Check if the account has SUI to pay for gas
         const coins = await suiClient.getCoins({
             owner: currentAccount.address,
-            coinType: "0x2::sui::SUI"
+            coinType: "0x2::sui::SUI",
         });
         if (!coins || coins.data.length === 0) {
-            throw new Error("Your wallet doesn't have any SUI tokens for gas payment. Please add some SUI to your wallet.");
+            console.log("No SUI found for gas – triggering testnet drip…");
+            const dripTx = await dripGas(currentAccount.address);
+            if (!dripTx) {
+                console.error("Drip failed, cannot create listing");
+                return null;
+            }
+            // optional: wait a few seconds or re‐fetch coins here
         }
 
         const tx = new Transaction();
@@ -553,28 +602,12 @@ export function useContract() {
     tokenAmount: number;
   }
 
-  const createOrderFromListing = async ({ 
-    listingId, 
-    tokenAmount 
-    }: CreateOrderParams): Promise<Transaction> => {
+  const createOrderFromListing = async ({ listingId, tokenAmount }: CreateOrderParams): Promise<Transaction> => {
     if (!currentAccount?.address) {
       throw new Error("No connected wallet");
     }
-  
-    // First check if the account has SUI to pay for gas
-    const coins = await suiClient.getCoins({
-      owner: currentAccount.address,
-      coinType: "0x2::sui::SUI"
-    });
-    
-    if (!coins || coins.data.length === 0) {
-      throw new Error("Your wallet doesn't have any SUI tokens for gas payment. Please add some SUI to your wallet.");
-    }
-  
-    // Create the transaction with the gas coin already set
+
     const tx = new Transaction();
-    
-    // Add the moveCall to create the order
     tx.moveCall({
       target: `${MarketplacePackageId}::${MODULE_NAME}::create_order_from_listing`,
       typeArguments: ["0x2::sui::SUI"],
@@ -582,11 +615,12 @@ export function useContract() {
         tx.object(listingId),
         tx.pure.u64(tokenAmount),
         tx.object(SUI_CLOCK_OBJECT_ID),
-      ]
+      ],
     });
-  
+
     return tx;
   };
+
   // Mark payment made (by buyer)
   const markPaymentMade = async (orderId: string): Promise<string | null> => {
    
@@ -618,6 +652,7 @@ export function useContract() {
       ]
     });
 
+    // auto‐drip, gas‐budget & retry handled inside handleTransaction
     return handleTransaction(tx);
   };
 
@@ -1149,6 +1184,9 @@ export function useContract() {
     getAllOrders,
     getOrdersByBuyer,
     getOrdersBySeller,
-    getOrderByOrderId
+    getOrderByOrderId,
+
+    // drip state
+    isDrippingGas,
   };
 }
