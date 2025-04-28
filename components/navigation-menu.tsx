@@ -12,6 +12,7 @@ import {
   LogOut,
   Bell,
   ShoppingCart,
+  RefreshCw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -78,6 +79,12 @@ export function NavigationMenu({ address, onClose }: NavigationMenuProps) {
               <Link href="/listings/new">
                 <PlusCircle className="h-5 w-5 mr-2" />
                 Create Listing
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" className="w-full justify-start" onClick={handleNavigation}>
+              <Link href="/swap">
+                <RefreshCw className="h-5 w-5 mr-2" />
+                Swap
               </Link>
             </Button>
             <Button asChild variant="ghost" className="w-full justify-start" onClick={handleNavigation}>

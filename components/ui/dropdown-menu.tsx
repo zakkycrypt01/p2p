@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
-import { Check, ChevronRight, Circle } from "lucide-react"
+import { Check, ChevronRight, Circle, MoreHorizontal } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -197,4 +197,41 @@ export {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
+}
+
+interface Notification {
+  id: string; // Adjust the type and fields as per your actual data structure
+  // Add other fields if necessary
+}
+
+export function NotificationItem({
+  notification,
+  onReadAction,
+}: {
+  notification: Notification;
+  onReadAction: (id: string) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between">
+      {/* ... your notification content … */}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="p-1 text-muted-foreground hover:text-foreground">
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent sideOffset={4}>
+          <DropdownMenuItem onSelect={() => onReadAction(notification.id)}>
+            Mark as read
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => console.log('Delete action triggered')}>
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
 }

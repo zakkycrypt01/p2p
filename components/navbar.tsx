@@ -52,12 +52,18 @@ export function Navbar() {
               >
                 Manage Orders
               </Link>
-              <Link
+                <Link
                 href="/dashboard"
                 className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/dashboard" ? "text-primary" : "text-foreground/60"}`}
-              >
+                >
                 Dashboard
-              </Link>
+                </Link>
+                <Link
+                href="/swap"
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/swap" ? "text-primary" : "text-foreground/60"}`}
+                >
+                Swap
+                </Link>
             </nav>
           )}
         </div>
