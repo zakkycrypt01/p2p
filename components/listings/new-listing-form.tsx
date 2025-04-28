@@ -18,8 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowUpRight, ArrowDownRight, AlertCircle } from "lucide-react"
 import { useContract } from "@/hooks/useContract"
 import { useSuiWallet } from "@/hooks/use-sui-wallet"
-
-
+import {useSubmitTransaction} from "@/hooks/useSubmitTransaction"
 
 // Mock data
 const tokens = [
@@ -29,7 +28,6 @@ const tokens = [
   { symbol: "USDT", name: "Tether", coinID: '0xTODO::usdt::USDT' },
   { symbol: "BTC", name: "Bitcoin", coinID: '0xTODO::btc::BTC' },
 ];
-
 
 const fiatCurrencies = ["USD", "EUR", "GBP", "JPY", "AUD"]
 
@@ -76,6 +74,7 @@ export function NewListingForm() {
   const connected = useSuiWallet()
   const {createListing} = useContract()
   const address = currentAccount?.address
+  const { executeTransaction } = useSubmitTransaction()
   
   const [fetchedCoinObjectId, setFetchedCoinObjectId] = useState<string | null>(null);
   
@@ -191,14 +190,24 @@ export function NewListingForm() {
         expiry: values.paymentWindow,
       });
       
-      const result = await createListing({
+      const params = {
         token_coin: values.token,
         token_amount: Number(tokenAmount),
         price: Number(price),
         expiry: values.paymentWindow,
         metadataKeys,
         metadataValues,
-      })
+      };
+
+      const tx = await createListing(params);
+      const digest = await executeTransaction(tx, {
+        successMessage: "Listing created!",
+        errorMessage: "Failed to create listing",
+        onSuccess: () => {
+            console.log("Listing created successfully");
+            router.push("/dashboard");
+        },
+      });
 
       toast({
         title: "Sell listing created successfully",

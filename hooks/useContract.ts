@@ -483,88 +483,52 @@ export function useContract() {
   }
 
   const createListing = async ({ 
-    token_amount,
-    price,
     token_coin,
+    price,
     expiry, 
+    token_amount, 
     metadataKeys = [], 
     metadataValues = []
-  }: CreateListingParams): Promise<string | null> => {
+  }: CreateListingParams): Promise<Transaction> => {
     if (!currentAccount?.address) {
-        console.error("No connected wallet");
-        return null;
+      throw new Error("No connected wallet");
     }
 
-    try {
-        // Check if the account has SUI to pay for gas
-        const coins = await suiClient.getCoins({
-            owner: currentAccount.address,
-            coinType: "0x2::sui::SUI",
-        });
-        if (!coins || coins.data.length === 0) {
-            console.log("No SUI found for gas – triggering testnet drip…");
-            const dripTx = await dripGas(currentAccount.address);
-            if (!dripTx) {
-                console.error("Drip failed, cannot create listing");
-                return null;
-            }
-            // optional: wait a few seconds or re‐fetch coins here
-        }
+    const tx = new Transaction();
 
-        const tx = new Transaction();
+    // split off exactly the amount to list
+    const [splitCoin] = tx.splitCoins(
+      tx.object(token_coin),
+      [tx.pure.u64(token_amount)]
+    );
 
-        // Verify ownership of the token_coin
-        const objectData = await suiClient.getObject({
-            id: token_coin,
-            options: { showOwner: true }
-        });
-        if (!objectData.data || !objectData.data.owner) {
-            console.error('Token coin object not found or has no owner data');
-            return null;
-        }
-        if (typeof objectData.data.owner === 'object' && 'AddressOwner' in objectData.data.owner) {
-            const ownerAddress = objectData.data.owner.AddressOwner;
-            if (currentAccount?.address !== ownerAddress) {
-                console.error(`Wallet address (${currentAccount?.address}) does not match token owner (${ownerAddress})`);
-                return null;
-            }
-        } else {
-            console.error('Token is not owned by an address (could be shared or immutable)');
-            return null;
-        }
+    // serialize metadata
+    const encodedKeys = metadataKeys.map(k => new TextEncoder().encode(k));
+    const encodedVals = metadataValues.map(v => new TextEncoder().encode(v));
+    const keysVec = bcs.vector(bcs.vector(bcs.u8())).serialize(
+      encodedKeys.map(arr => Array.from(arr))
+    );
+    const valsVec = bcs.vector(bcs.vector(bcs.u8())).serialize(
+      encodedVals.map(arr => Array.from(arr))
+    );
 
-        // Split the coin to only use the exact amount needed
-        const [splitCoin] = tx.splitCoins(tx.object(token_coin), [tx.pure.u64(token_amount)]);
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::create_listing`,
+      typeArguments: ["0x2::sui::SUI"],
+      arguments: [
+        tx.object(EscrowConfigObjectId),
+        tx.object(TokenRegistryObjectId),
+        splitCoin,
+        tx.pure.u64(token_amount),
+        tx.pure.u64(price),
+        tx.pure.u64(expiry),
+        tx.pure(keysVec),
+        tx.pure(valsVec),
+        tx.object(SUI_CLOCK_OBJECT_ID),
+      ],
+    });
 
-        // Encode metadata as arrays of Uint8Arrays
-        const encodedKeys = metadataKeys.map(key => new TextEncoder().encode(key));
-        const encodedValues = metadataValues.map(value => new TextEncoder().encode(value));
-        const keyVectors = encodedKeys.map(k => Array.from(k));
-        const valueVectors = encodedValues.map(v => Array.from(v));
-        const keysVector = bcs.vector(bcs.vector(bcs.u8())).serialize(keyVectors);
-        const valuesVector = bcs.vector(bcs.vector(bcs.u8())).serialize(valueVectors);
-
-        tx.moveCall({
-            target: `${MarketplacePackageId}::${MODULE_NAME}::create_listing`,
-            typeArguments: ['0x2::sui::SUI'],
-            arguments: [
-                tx.object(EscrowConfigObjectId),
-                tx.object(TokenRegistryObjectId),
-                splitCoin,
-                tx.pure.u64(token_amount),
-                tx.pure.u64(price),
-                tx.pure.u64(expiry),
-                tx.pure(keysVector),
-                tx.pure(valuesVector),
-                tx.object(SUI_CLOCK_OBJECT_ID),
-            ],
-        });
-
-        return handleTransaction(tx);
-    } catch (error) {
-        console.error("Error creating listing:", error);
-        return null;
-    }
+    return tx;
   };
 
   // Cancel a listing
