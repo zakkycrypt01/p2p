@@ -35,7 +35,7 @@ export function NavigationMenu({ address, onClose }: NavigationMenuProps) {
   return (
     <div className="flex flex-col h-full py-6">
       <div className="flex items-center gap-2 font-semibold mb-6">
-        <Package2 className="h-6 w-6 text-primary" />
+        <img src="/logo.png" alt="SuiXchange Logo" className="h-6 w-6" />
         <span>SuiXchange</span>
       </div>
 

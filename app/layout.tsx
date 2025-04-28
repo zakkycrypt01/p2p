@@ -11,7 +11,7 @@ import { Toaster } from "@/components/ui/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "P2P Trading Platform",
+  title: "SuiXchange",
   description: "Secure peer-to-peer cryptocurrency trading platform",
 }
 

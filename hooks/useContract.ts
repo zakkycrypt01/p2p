@@ -49,7 +49,7 @@ const disputeInfoReturn = bcs.struct('DisputeInfoReturn', {
 const OptionListingInfoReturn = bcs.option(listingInfoReturn);
 const OptionOrderInfoReturn = bcs.option(orderInfoReturn);
 const OptionDisputeInfoReturn = bcs.option(disputeInfoReturn);
-const PACKAGE_ADDRESS = '0x91b726490989f4b3ea355619a913c33ce88dc17dbd38288ac64fd280be811322'; // Replace with your actual package address
+const PACKAGE_ADDRESS = '0x5a4401f6f1b16492b3bfdfb95059ddbd234d75782c18c4bf5fe1566b4e44c7e9'; // Replace with your actual package address
 
 const gqlClient = new SuiGraphQLClient({
   url: 'https://sui-devnet.mystenlabs.com/graphql',

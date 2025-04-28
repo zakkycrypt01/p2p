@@ -32,10 +32,10 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <Link href={address ? "/dashboard" : "/"} className="flex items-center gap-2 font-semibold">
-            <Package2 className="h-6 w-6 text-primary" />
+            <Link href={address ? "/dashboard" : "/"} className="flex items-center gap-2 font-semibold">
+            <img src="/logo.png" alt="SuiXchange Logo" className="h-6 w-6" />
             <span className="hidden sm:inline">SuiXchange</span>
-          </Link>
+            </Link>
 
           {/* Desktop Navigation */}
           {address && (
