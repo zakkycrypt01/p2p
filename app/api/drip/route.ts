@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Service not configured' }, { status: 500 });
     }
 
-    const client = new SuiClient({ url: getFullnodeUrl('devnet') });
+    const client = new SuiClient({ url: getFullnodeUrl('testnet') });
     // skip drip if user already has ≥0.02 SUI
     const userCoins = await client.getCoins({ owner: recipient, coinType: '0x2::sui::SUI' });
     const userTotal = userCoins.data.reduce((sum, c) => sum + BigInt(c.balance), BigInt(0));

@@ -13,7 +13,7 @@ interface FetchCoinObjectIdParams {
 }
 
 async function fetchCoinObjectId({ address }: FetchCoinObjectIdParams): Promise<string> {
-  const client = new SuiClient({ url: "https://fullnode.devnet.sui.io" });
+  const client = new SuiClient({ url: "https://fullnode.testnet.sui.io" });
   const coinObjects = await client.getCoins({ owner: address });
   const coinObjectId = coinObjects.data[0]?.coinObjectId || "";
   console.log('coinObjectId :>> ', coinObjectId);

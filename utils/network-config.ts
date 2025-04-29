@@ -1,6 +1,6 @@
 import { getFullnodeUrl } from "@mysten/sui/client";
 import {
-  DEVNET_MARKETPLACE_PACKAGE_ID,
+  TESTNET_MARKETPLACE_PACKAGE_ID,
   MAINNET_MARKETPLACE_PACKAGE_ID,
   ESCROWCONFIG_OBJECT_ID,
   TOKENREGISTRY_OBJECT_ID,
@@ -10,15 +10,15 @@ import { createNetworkConfig, useSuiClientContext } from "@mysten/dapp-kit";
 import { createContext, useContext } from "react";
 
 const NETWORK_CONFIG = {
-  devnet : {
+  testnet : {
     MarketplacePackageId:
-      "0x5a4401f6f1b16492b3bfdfb95059ddbd234d75782c18c4bf5fe1566b4e44c7e9",
+      "0x52aac053e77b411e6673d8656a317f4730f2cf6c7d3c891eca69a8b348980d69",
     EscrowConfigObjectId:
-      "0x6c7d7bd4beddec6e6fbfc557165dafa45df2c317df61409ebbf84f354caa54ba",
+      "0x82473bfb9490f36fc2061ad8396c47049119251870265920398fd1d2f9ce3dfb",
     TokenRegistryObjectId:
-      "0xeedb17f2415c1dc2efe9a920ed1d8aedbe7ffe995562dc864a48d973452cea2e",
+      "0x8c76d91d2b3b878a811fd5bdaf96d3d39692fa68ea87d7241a9cbebbf96ad155",
     AdminCapObjectId:
-      "0x616ccd1c557d95bb695b428f5edc4d6f59997f68d7dbf9de5b7baffd851785f2"
+      "0xa8b7b87b4039b9e65a5defe799e0b074427dcff83b15dbedba2e496fa492a280"
   },
   mainnet : {
     MarketplacePackageId: "0x0TODO", // Replace with mainnet package ID
@@ -31,10 +31,10 @@ const { network } = useSuiClientContext();
 return NETWORK_CONFIG[network as Network];
 }
   const {networkConfig, useNetworkVariable} = createNetworkConfig({
-  devnet: {
-    url: getFullnodeUrl("devnet"),
+  testnet: {
+    url: getFullnodeUrl("testnet"),
     variables: {
-      MarketplacePackageId: DEVNET_MARKETPLACE_PACKAGE_ID,
+      MarketplacePackageId: TESTNET_MARKETPLACE_PACKAGE_ID,
       TokenRegistryObjectId: TOKENREGISTRY_OBJECT_ID,
       EscrowConfigObjectId:ESCROWCONFIG_OBJECT_ID,
       AdminCapObjectId:ADMINCAP_OBJECT_ID

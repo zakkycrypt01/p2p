@@ -124,7 +124,7 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
    const [tokenIcon, setTokenIcon] = useState<string[]>([]);
    async function fetchTokenDetails(digest: string) {
      const client = new SuiClient({
-       url: getFullnodeUrl('devnet') 
+       url: getFullnodeUrl('testnet') 
      });
  
      try {

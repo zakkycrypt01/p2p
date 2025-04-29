@@ -49,13 +49,12 @@ const disputeInfoReturn = bcs.struct('DisputeInfoReturn', {
 const OptionListingInfoReturn = bcs.option(listingInfoReturn);
 const OptionOrderInfoReturn = bcs.option(orderInfoReturn);
 const OptionDisputeInfoReturn = bcs.option(disputeInfoReturn);
-const PACKAGE_ADDRESS = '0x5a4401f6f1b16492b3bfdfb95059ddbd234d75782c18c4bf5fe1566b4e44c7e9'; // Replace with your actual package address
+const PACKAGE_ADDRESS = '0x52aac053e77b411e6673d8656a317f4730f2cf6c7d3c891eca69a8b348980d69';
 
 const gqlClient = new SuiGraphQLClient({
-  url: 'https://sui-devnet.mystenlabs.com/graphql',
+  url: 'https://sui-testnet.mystenlabs.com/graphql',
 });
 
-// Query to fetch all listings from the contract
 const fetchListingsQuery = graphql(`
   query FetchListings {
     objects(
@@ -127,7 +126,6 @@ async function getAllListings() {
     query: fetchListingsQuery,
   });
 
-  // Process the results to extract listing details
   type FetchListingsResult = {
     data: {
       objects: {

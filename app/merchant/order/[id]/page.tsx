@@ -1065,7 +1065,7 @@ export default function OrderDetailPage() {
           {/* View on explorer */}
           <Button variant="outline" className="w-full" asChild>
             <a
-              href={`https://devnet.suivision.xyz/object/${formattedOrder.id}`}
+              href={`https://testnet.suivision.xyz/object/${formattedOrder.id}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center"
