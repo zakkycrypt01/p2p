@@ -3,14 +3,17 @@
     <img src="./public/logo2.jpg" alt="SuiXchange">
   </a>
 </p>
+
 <h3 align="center">SuiXchange</h3>
 
 <div align="center">
-  [![Hackathon](https://img.shields.io/badge/hackathon-Overflow-orange.svg)](https://sui.io/overflow)
-  [![Status](https://img.shields.io/badge/status-active-success.svg)]()
-  [![GitHub Issues](https://img.shields.io/github/issues/zakkycrypt01/p2p.svg)](https://github.com/zakkycrypt01/p2p/issues)
-  [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/zakkycrypt01/p2p.svg)](https://github.com/zakkycrypt01/p2p/pulls)
-  [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
+
+[![Hackathon](https://img.shields.io/badge/hackathon-Overflow-orange.svg)](https://sui.io/overflow)
+[![Status](https://img.shields.io/badge/status-active-success.svg)]()
+[![GitHub Issues](https://img.shields.io/github/issues/zakkycrypt01/p2p.svg)](https://github.com/zakkycrypt01/p2p/issues)
+[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/zakkycrypt01/p2p.svg)](https://github.com/zakkycrypt01/p2p/pulls)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
+
 </div>
 
 ---
