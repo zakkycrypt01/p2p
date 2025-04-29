@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/zakkycrypt01/p2p" rel="noopener">
-    <img src="/public/logo.png" alt="SuiXchange">
+    <img src="./public/logo.png" alt="SuiXchange">
   </a>
 </p>
 <h3 align="center">SuiXchange</h3>
@@ -14,10 +14,6 @@
 </div>
 
 ---
-
-<p align="center"> Few lines describing your project.  
-    <br>  
-</p>
 
 ## 📝 Table of Contents
 
