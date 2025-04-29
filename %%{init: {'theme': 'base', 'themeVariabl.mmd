@@ -1,0 +1,69 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#5D8AA8', 'primaryTextColor': '#fff', 'primaryBorderColor': '#5D8AA8', 'lineColor': '#6082B6', 'secondaryColor': '#62B1F6', 'tertiaryColor': '#D8BFD8' }}}%%
+flowchart TD
+    classDef mainNode fill:#5D8AA8,stroke:#333,stroke-width:2px,color:white,rounded
+    classDef stateNode fill:#D8BFD8,stroke:#333,stroke-width:1px,color:black
+    classDef functionNode fill:#62B1F6,stroke:#333,stroke-width:1px,color:white
+    classDef objectNode fill:#A7C7E7,stroke:#333,stroke-width:2px,color:black,rounded
+
+    linkStyle default stroke:#6082B6,stroke-width:2px,color:black
+
+    %% Initialization section
+    subgraph Initialization["Initialization"]
+        init["init()"]:::functionNode --> config["Create EscrowConfig"]:::mainNode
+        init --> token_reg["Create TokenRegistry"]:::mainNode
+        init --> admin_cap["Create AdminCap"]:::mainNode
+        token_reg --> add_sui["Add SUI Token"]:::functionNode
+        token_reg --> add_usdc["Add USDC Token"]:::functionNode
+    end
+
+    %% Listing Management section
+    subgraph Listing["Listing Management"]
+        create_listing["create_listing()"]:::functionNode --> listing["Listing Object"]:::objectNode
+        listing --> cancel_listing["cancel_listing()"]:::functionNode
+        listing --> reclaim_expired["reclaim_expired_listing()"]:::functionNode
+        listing --> create_order["create_order_from_listing()"]:::functionNode
+        listing --- listing_states["ACTIVE, PARTIALLY_SOLD,<br> SOLD, CANCELED, EXPIRED"]:::stateNode
+    end
+
+    %% Order Flow section
+    subgraph Order["Order Flow"]
+        create_order --> order["Order Object"]:::objectNode
+        order --> payment_made["mark_payment_made()"]:::functionNode
+        payment_made --> payment_received["mark_payment_received()"]:::functionNode
+        payment_received --> complete["Order Completed"]:::stateNode
+        order --> cancel_order["cancel_order()"]:::functionNode
+        order --> process_expired["process_expired_order()"]:::functionNode
+        order --- order_states["ACTIVE, PAYMENT_MADE, COMPLETED,<br> CANCELED, DISPUTED, EXPIRED"]:::stateNode
+    end
+
+    %% Dispute Flow section
+    subgraph Dispute["Dispute Flow"]
+        payment_made --> create_dispute["create_dispute()"]:::functionNode
+        create_dispute --> dispute["Dispute Object"]:::objectNode
+        dispute --> respond["respond_to_dispute()"]:::functionNode
+        dispute --> resolve_buyer["resolve_dispute_for_buyer()"]:::functionNode
+        dispute --> resolve_seller["resolve_dispute_for_seller()"]:::functionNode
+        dispute --- dispute_states["OPEN, RESOLVED_FOR_BUYER,<br> RESOLVED_FOR_SELLER"]:::stateNode
+    end
+
+    %% Admin Actions section
+    subgraph Admin["Admin Actions"]
+        admin_cap --> admin_cancel["admin_force_cancel_order()"]:::functionNode
+        admin_cap --> update_fee["update_fee_collector()"]:::functionNode
+        admin_cap --> update_expiry["update_expiry_params()"]:::functionNode
+        admin_cap --> add_token["add_token_type()"]:::functionNode
+        admin_cap --> set_token["set_token_status()"]:::functionNode
+        admin_cap --> admin_dispute["Admin Dispute Resolution"]:::functionNode
+    end
+
+    %% Cross-linking with cleaner connections
+    admin_dispute --> resolve_buyer
+    admin_dispute --> resolve_seller
+    payment_received --> config
+
+    %% Styling for each subgraph
+    style Initialization fill:#F0F8FF,stroke:#5D8AA8,stroke-width:2px
+    style Listing fill:#E6E6FA,stroke:#5D8AA8,stroke-width:2px
+    style Order fill:#F0FFF0,stroke:#5D8AA8,stroke-width:2px
+    style Dispute fill:#FFF0F5,stroke:#5D8AA8,stroke-width:2px
+    style Admin fill:#F5F5DC,stroke:#5D8AA8,stroke-width:2px
