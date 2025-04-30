@@ -172,19 +172,15 @@ export default function CreateOrderPage() {
               return txDigest;
             }
           }
-          
-          // If we couldn't find the order ID from events
-          toast({
+            toast({
             title: "Order created",
             description: "Your order was created successfully, but we couldn't retrieve the order details.",
           });
           
-          // Navigate to orders page as fallback
           // router.push('/orders');
           return txDigest;
         } catch (error) {
           console.error("Error fetching transaction events:", error);
-          // Still consider this a success as the transaction went through
           // router.push('/orders');
           return txDigest;
         }

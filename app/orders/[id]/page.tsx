@@ -154,7 +154,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   const [isConfirming, setIsConfirming] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [expiryTimestamp, setExpiryTimestamp] = useState<number | null>(null)
-  const [formattedOrder, setFormattedOrder] = useState<any>(null)
+  const [formattedOrder, setFormattedOrder] = useState<Record<string, any> | null>(null)
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -240,6 +240,25 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
     fetchOrder()
   }, [address, id, router, toast, getOrder])
 
+  useEffect(() => {
+    if (!order?.id) return;
+    const interval = setInterval(async () => {
+      try {
+        const updated = await getOrder({ id: order.id });
+        if (updated) {
+          const newStatus = getStatusFromCode(Number(updated.status));
+          setFormattedOrder((prev: Record<string, any> | null) =>
+            prev ? { ...prev, status: newStatus } : prev
+          );
+        }
+      } catch (err) {
+        console.error("Polling order status failed:", err);
+      }
+    }, 30000); // every 30s
+
+    return () => clearInterval(interval);
+  }, [order, getOrder]);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString()
   }
@@ -282,21 +301,14 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   }
 
   const handleCancelOrder = async () => {
-    setIsCancelling(true)
+    setIsCancelling(true);
     try {
-      // Cancel the order in our order system
-      await cancelOrder(order.id)
-
-      // Update local state
-      setFormattedOrder((prev: any) => ({ ...prev, status: "cancelled" }))
-
-      toast({
-        title: "Order cancelled",
-        description: "Your order has been cancelled",
-      })
-
-      // Redirect to dashboard after a short delay
-      setTimeout(() => router.push("/dashboard"), 1500)
+      await cancelOrder(order.id);
+      setFormattedOrder((prev: Record<string, any> | null) =>
+        prev ? { ...prev, status: "cancelled" } : prev
+      );
+      toast({ title: "Order cancelled", description: "Your order has been cancelled" });
+      setTimeout(() => router.push("/dashboard"), 1500);
     } catch (error) {
       console.error("Error cancelling order:", error)
       toast({
@@ -305,13 +317,11 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
         variant: "destructive",
       })
     } finally {
-      setIsCancelling(false)
+      setIsCancelling(false);
     }
   }
 
   const handleUploadPaymentProof = () => {
-    // In a real app, this would open a file picker and upload the proof
-    // For this mock, we'll just simulate it
     const mockProofUrl = "/placeholder.svg?height=300&width=400"
     uploadPaymentProof(order.id, mockProofUrl)
 

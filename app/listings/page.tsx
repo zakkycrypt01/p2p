@@ -14,7 +14,7 @@ export default function Listings() {
         <h1 className="text-3xl font-bold">Merchant Order Book</h1>
       </div>
 
-      <Tabs defaultValue="buy" onValueChange={(value) => setOrderType(value as "buy" | "sell")} className="w-full mb-6">
+      <Tabs defaultValue="sell" onValueChange={(value) => setOrderType(value as "buy" | "sell")} className="w-full mb-6">
         <div className="border-b mb-6">
           <TabsList className="bg-transparent -mb-px">
             <TabsTrigger

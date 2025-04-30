@@ -200,19 +200,17 @@ export function NewListingForm() {
       };
 
       const tx = await createListing(params);
-      const digest = await executeTransaction(tx, {
-        successMessage: "Listing created!",
+      await executeTransaction(tx, {
+        successMessage: "Sell listing created!",
         errorMessage: "Failed to create listing",
         onSuccess: () => {
-            console.log("Listing created successfully");
-            router.push("/dashboard");
+          toast({
+            title: "Sell listing created successfully",
+            description: "Your listing has been published to the order book",
+          });
+          router.push("/dashboard");
         },
       });
-
-      toast({
-        title: "Sell listing created successfully",
-        description: "Your listing has been published to the order book",
-      })
 
     } catch (error) {
       console.error("Error creating listing:", error)
@@ -223,8 +221,6 @@ export function NewListingForm() {
       })
     } finally {
       setIsSubmitting(false)
-      await new Promise((resolve) => setTimeout(resolve, 100000));
-      router.push("/dashboard");
     }
   }
 

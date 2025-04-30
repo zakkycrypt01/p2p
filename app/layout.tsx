@@ -13,6 +13,11 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "SuiXchange",
   description: "Secure peer-to-peer cryptocurrency trading platform",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
 }
 
 export default function RootLayout({
@@ -29,7 +34,9 @@ export default function RootLayout({
               <div className="min-h-screen flex flex-col">
                 <Navbar />
                 <main className="flex-1">{children}</main>
-                <Toaster />
+                <div className="fixed top-4 right-4 z-50">
+                  <Toaster />
+                </div>
               </div>
             </WebSocketProvider>
           </SuiProvider>
