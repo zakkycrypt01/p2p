@@ -18,35 +18,35 @@ export default function Listings() {
         <div className="border-b mb-6">
           <TabsList className="bg-transparent -mb-px">
             <TabsTrigger
-              value="buy"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-            >
-              Sell Your Crypto
-              <span className="ml-2 text-xs text-muted-foreground">(Merchant buys)</span>
-            </TabsTrigger>
-            <TabsTrigger
               value="sell"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
             >
               Buy Crypto
               <span className="ml-2 text-xs text-muted-foreground">(Merchant sells)</span>
             </TabsTrigger>
+            <TabsTrigger
+              value="buy"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+            >
+              Sell Your Crypto
+              <span className="ml-2 text-xs text-muted-foreground">(Merchant buys)</span>
+            </TabsTrigger>
           </TabsList>
         </div>
-
-        <TabsContent value="buy" className="mt-0">
+        <TabsContent value="sell" className="mt-0">
           <div className="mb-6">
             <ListingFilter orderType="buy" />
           </div>
           <ListingList orderType="buy" />
         </TabsContent>
 
-        <TabsContent value="sell" className="mt-0">
+        <TabsContent value="buy" className="mt-0">
           <div className="mb-6">
             <ListingFilter orderType="sell" />
           </div>
           <ListingList orderType="sell" />
         </TabsContent>
+
       </Tabs>
     </div>
   )

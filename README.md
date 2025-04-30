@@ -12,6 +12,8 @@
 [![Status](https://img.shields.io/badge/status-active-success.svg)]()
 [![GitHub Issues](https://img.shields.io/github/issues/zakkycrypt01/p2p.svg)](https://github.com/zakkycrypt01/p2p/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/zakkycrypt01/p2p.svg)](https://github.com/zakkycrypt01/p2p/pulls)
+[![Vercel](https://vercelbadge.vercel.app/api/zakkycrypt01/p2p)](https://vercel.com/zakkycrypt01/p2p)
+
 
 </div>
 
@@ -20,16 +22,17 @@
 
 ## 📝 Table of Contents
 
-- [Problem Statement](#problem-statement)  
-- [Idea / Solution](#idea--solution)  
-- [Move Contract Workflow](#move-contract-workflow) 
-- [Future Scope](#future-scope)  
-- [Setting Up a Local Environment](#setting-up-a-local-environment)  
-- [Usage](#usage)  
-- [Technology Stack](#technology-stack)  
-- [Contributing](#contributing)  
-- [Authors](#authors)  
-- [Acknowledgments](#acknowledgments)  
+- [Problem Statement](#🧩-problem-statement)  
+- [Idea / Solution](#💡-idea--solution)  
+- [Move Contract Workflow](#🛠️-move-contract-workflow) 
+- [Future Scope](#🚀-future-scope)  
+- [Setting Up a Local Environment](#🛠️-setting-up-a-local-environment)  
+- [Usage](#⚙️-usage)  
+- [Technology Stack](#🧱-technology-stack)  
+- [Contributing](#🤝-contributing)  
+- [Authors](#👥-authors)  
+- [Acknowledgments](#🙏-acknowledgments)  
+
 
 ## 🧩 Problem Statement
 
