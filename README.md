@@ -24,8 +24,9 @@
 
 - [Problem Statement](#🧩-problem-statement)  
 - [Idea / Solution](#💡-idea--solution)  
-- [Move Contract Workflow](#🛠️-move-contract-workflow) 
+- [Move Contract Workflow](#🛠️-move-contract-workflow)  
 - [Future Scope](#🚀-future-scope)  
+- [Demo](#📺-demo)  
 - [Setting Up a Local Environment](#🛠️-setting-up-a-local-environment)  
 - [Usage](#⚙️-usage)  
 - [Technology Stack](#🧱-technology-stack)  
@@ -220,6 +221,30 @@ flowchart TD
 | **Blockchain**         | Sui Network, Move Smart Contracts    |
 | **Real-Time Updates**  | REST API, WebSockets                 |
 | **Security**           | JWT, Encrypted Storage, Rate Limiting|
+
+---
+## 📺 Demo
+
+Check out the live demo of **SuiXchange** in action:
+
+🔗 **Live URL**: [https://p2p-zakkycrypt01.vercel.app](https://p2p-zakkycrypt01.vercel.app)
+
+### 🎥 Preview Screenshots
+
+<p float="left">
+  <img src="public/home.png" width="100%" alt="Home Page" />
+</p>
+
+<p>
+  <img src="public/listing.png" width="100%" alt="Create Listing" />
+
+</p>
+
+<p float="left">
+  <img src="public/order.png" width="100%" alt="Order Book" />
+</p>
+
+> 💡 *For the best experience, use a modern browser with a Sui-compatible wallet extension installed.*
 
 ---
 
