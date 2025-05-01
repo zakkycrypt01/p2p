@@ -227,7 +227,7 @@ flowchart TD
 
 Check out the live demo of **SuiXchange** in action:
 
-🔗 **Live URL**: [https://p2p-zakkycrypt01.vercel.app](https://p2p-zakkycrypt01.vercel.app)
+🔗 **Live URL**: [https://sui-exchange.vercel.app](https://sui-exchange.vercel.app)
 
 ### 🎥 Preview Screenshots
 
