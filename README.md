@@ -274,5 +274,5 @@ Special thanks to:
 - **Hackathon Mentors** for guidance and validation.  
 - **Sui Hackathon Community** for help and guidiance.
 
-This platform is built by the community, for the community—pioneering a decentralized, secure, and gasless way to trade peer-to-peer.
+>This platform is built by the community, for the community—pioneering a decentralized, secure, and gasless way to trade peer-to-peer.
 
