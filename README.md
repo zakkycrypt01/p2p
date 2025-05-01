@@ -227,7 +227,7 @@ flowchart TD
 
 Check out the live demo of **SuiXchange** in action:
 
-🔗 **Live URL**: [https://sui-xchange.vercel.app](https://sui-exchange.vercel.app)
+🔗 **Live URL**: [https://sui-xchange.vercel.app](https://sui-xchange.vercel.app)
 
 ### 🎥 Preview Screenshots
 
