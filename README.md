@@ -39,11 +39,11 @@
 
 The global rise of cryptocurrency adoption has highlighted the growing demand for decentralized trading solutions that are accessible, trustless, and user-centric. Despite this, existing P2P trading platforms face critical issues:
 
-- **High Gas Fees**: Many blockchains impose significant transaction costs that hinder accessibility, especially in developing regions.  
-- **Lack of Trustless Escrow**: Most platforms still rely on centralized systems for holding assets, introducing counterparty risk.  
-- **Poor UX/UI**: Complex interfaces and non-intuitive flows reduce engagement, particularly for first-time users.  
+- **Gas Fees Limitation**: New users want to use dApps but don’t have SUI for gas.  
+- **Centralize Exchange as a source of getting Sui**: Getting SUI requires registering on centralized exchanges.  
+- **Entry Barrier**: Barrier to entry leads to user churn and reduced ecosystem growth.  
 - **Unstructured Dispute Handling**: Dispute resolution is often opaque or slow, which can erode user trust.  
-- **Limited Fiat Coordination Tools**: Existing platforms don’t support smooth communication or verification between users making fiat transfers.
+- **KYC, Purchase and Withdrawal Threshold**: Existing platforms have withdrawal fees, minimum amounts, and KYC which delay user adoption
 
 These problems create friction for users, reduce retention, and inhibit mass adoption.
 
