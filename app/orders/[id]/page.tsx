@@ -27,6 +27,7 @@ import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { useOrders } from "@/hooks/use-orders"
+import { ChatButton } from "@/components/chat/chat-button"
 
 interface OrderDetailPageProps {
   params: Promise<{
@@ -766,6 +767,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
 
               {formattedOrder.status === "payment_sent" && (
                 <>
+                <ChatButton orderId={order.id} className="w-full" hasNewMessages={true} />
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm">
                       Your payment has been marked as sent. The merchant will verify and release the crypto to your

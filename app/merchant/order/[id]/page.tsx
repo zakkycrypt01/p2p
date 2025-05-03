@@ -25,6 +25,7 @@ import Link from "next/link"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Progress } from "@/components/ui/progress"
 import { useContract } from "@/hooks/useContract"
+import { ChatButton } from "@/components/chat/chat-button"
 
 // Define the FormattedOrder interface
 interface FormattedOrder {
@@ -914,6 +915,7 @@ export default function OrderDetailPage() {
               <CardTitle>Order Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+            <ChatButton orderId={id} hasNewMessages={formattedOrder?.status === "payment_sent"} />
               {canConfirmPayment && (
                 <div className="space-y-2">
                   <div className="flex items-start gap-2 p-2 bg-muted rounded-md mb-2">
