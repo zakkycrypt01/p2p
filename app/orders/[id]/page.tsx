@@ -745,6 +745,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
               <CardTitle>Order Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <ChatButton orderId={order.id} className="w-full" />
               {formattedOrder.status === "pending_payment" && (
                 <>
                   <Button className="w-full" onClick={confirmPaymentSent} disabled={isConfirming}>
@@ -767,7 +768,6 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
 
               {formattedOrder.status === "payment_sent" && (
                 <>
-                <ChatButton orderId={order.id} className="w-full" hasNewMessages={true} />
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm">
                       Your payment has been marked as sent. The merchant will verify and release the crypto to your
