@@ -915,7 +915,10 @@ export default function OrderDetailPage() {
               <CardTitle>Order Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-            <ChatButton orderId={id} hasNewMessages={formattedOrder?.status === "payment_sent"} />
+              <ChatButton
+                orderId={id}
+                hasNewMessages={formattedOrder?.status === 'payment_sent'}
+              />
               {canConfirmPayment && (
                 <div className="space-y-2">
                   <div className="flex items-start gap-2 p-2 bg-muted rounded-md mb-2">
