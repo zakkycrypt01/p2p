@@ -181,6 +181,56 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
   }
   , [fetchedAds])
 
+  useEffect (() => {
+    const addAdsToDatabase = async () => {
+      try {
+        const details = await Promise.all(
+          fetchedAds.map(async (ad) => {
+            const info = ad.transactionDigest
+              ? await fetchTokenDetails(ad.transactionDigest)
+              : null
+            return {
+              id: ad.id,
+              tokenSymbol: info?.symbol || "Unknown",
+              tokenIcon:   info?.icon   || "https://res.cloudinary.com/dh0hcpmzk/image/upload/v1744934236/sui_p6ug5f.png",
+              amount: info?.decimals !== undefined 
+                ? Number(ad.remainingAmount) / (10 ** info.decimals) 
+                : Number(ad.remainingAmount) / (10 ** 9),
+              price: ad.price / 100,
+              fiatCurrency: 'USD',
+              paymentMethod: ad.paymentMethod || "Unknown",
+              createdAt: ad.createdAt 
+                ? new Date(Number(ad.createdAt) * 1000).toISOString()
+                : "Unknown",
+              orderType: "sell",
+              address: ad.ownerAddress,
+              buyerAddress: ad.ownerAddress,
+              buyerRating: 0,
+              description: ad.description || "No description provided",
+              minAmount: ad.minAmount !== undefined
+                ? ad.minAmount / (10 ** (info?.decimals ?? 0))
+                : undefined,
+              maxAmount: ad.maxAmount !== undefined
+                ? ad.maxAmount / (10 ** (info?.decimals ?? 0))
+                : undefined,
+              expiry: ad.expiry? new Date(Number(ad.expiry) * 1000).toISOString()
+              : "Unknown",
+              status: ad.status || "Unknown",
+            }
+          })
+        )
+        await addListings(details)
+        console.log("Ads added to the database successfully.");
+      } catch (error) {
+        console.error("Error adding ads to the database:", error)
+      }
+    }
+    if (fetchedAds.length > 0) {
+      addAdsToDatabase()
+    }
+  }
+  , [fetchedAds, fetchTokenDetails])
+
   useEffect(() => {
     if (!fetchAttemptedRef.current && address) {
       fetchAttemptedRef.current = true

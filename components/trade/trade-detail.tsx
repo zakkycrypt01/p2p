@@ -22,6 +22,7 @@ interface Listing {
   price: number
   fiatCurrency: string
   sellerAddress: string
+  address: string
   sellerRating: number
   paymentMethods: string[]
   status: string
@@ -339,7 +340,7 @@ export function TradeDetail({ listing }: TradeDetailProps) {
               </div>
               <div>
                 <p className="font-medium">
-                  {listing.sellerAddress.slice(0, 6)}...{listing.sellerAddress.slice(-4)}
+                  {listing.address.slice(0, 6)}...{listing.address.slice(-4)}
                 </p>
                 <div className="flex items-center gap-1 text-primary">
                   <Star className="h-4 w-4 fill-current" />
