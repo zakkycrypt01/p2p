@@ -216,6 +216,68 @@ module escrow::marketplace {
         resolved_by: address,
     }
 
+    // Buy advertisement structure
+    public struct BuyAdvert<phantom CoinType> has key, store {
+        id: UID,
+        buyer: address,           // The merchant who wants to buy tokens
+        token_amount: u64,        // Total token amount they want to buy
+        remaining_amount: u64,    // Remaining tokens they still want to buy
+        offered_price: u64,       // Price they're willing to pay per token unit
+        min_sell_amount: u64,     // Minimum amount a seller can sell in one order
+        max_sell_amount: u64,     // Maximum amount a seller can sell in one order
+        expiry: u64,              // When the advertisement expires
+        created_at: u64,          // When the advertisement was created
+        status: u8,               // Status of the advertisement (using same status constants as listing)
+        metadata: vector<MetadataEntry>, // Additional metadata
+    }
+
+    // Sale order from seller to buyer (merchant)
+    public struct SaleOrder<phantom CoinType> has key, store {
+        id: UID,
+        seller: address,          // The user selling their tokens
+        buyer: address,           // The merchant buying the tokens
+        token_amount: u64,        // Amount of tokens being sold
+        price: u64,               // Total price for the tokens
+        fee_amount: u64,          // Platform fee
+        expiry: u64,              // When the order expires
+        status: u8,               // Status of the order
+        created_at: u64,          // When the order was created
+        escrowed_coin: Balance<CoinType>, // Seller's escrowed tokens
+        payment_made: bool,       // Has the buyer (merchant) made payment?
+        payment_received: bool,   // Has the seller confirmed receipt of payment?
+        metadata: vector<MetadataEntry>, // Additional metadata
+        advert_id: ID,            // Reference to the original buy advertisement
+    }
+
+    // Events
+    public struct BuyAdvertCreatedEvent has copy, drop {
+        advert_id: ID,
+        buyer: address,
+        token_amount: u64,
+        offered_price: u64,
+        expiry: u64,
+    }
+
+    public struct BuyAdvertUpdatedEvent has copy, drop {
+        advert_id: ID,
+        remaining_amount: u64,
+    }
+
+    public struct BuyAdvertCanceledEvent has copy, drop {
+        advert_id: ID,
+        by: address,
+    }
+
+    public struct SaleOrderCreatedEvent has copy, drop {
+        order_id: ID,
+        advert_id: ID,
+        seller: address,
+        buyer: address,
+        token_amount: u64,
+        price: u64,
+        expiry: u64,
+    }
+
     fun init(ctx: &mut TxContext) {
         let config = EscrowConfig {
             id: object::new(ctx),
@@ -913,11 +975,6 @@ module escrow::marketplace {
         
         token_info.is_active
     }
-
-    // ============== Query Functions ==============
-
-    /// Get listing details by its ID
-    /// @return seller address, token amount, remaining amount, price, expiry, created time, status, listing ID
     public fun get_listing_by_id<CoinType>(listing: &Listing<CoinType>): (address, u64, u64, u64, u64, u64, u8, ID) {
         (
             listing.seller,
@@ -930,21 +987,12 @@ module escrow::marketplace {
             object::id(listing)
         )
     }
-
-    /// Get all listings for a seller
-    /// Not implemented directly in Move - must be done via indexer or RPC query
-    /// This is a placeholder for documentation purposes
     public fun get_listings_by_seller(_seller: address): vector<ID> {
         abort ENotImplemented
     }
-
-    /// Get listing metadata
     public fun get_listing_metadata<CoinType>(listing: &Listing<CoinType>): &vector<MetadataEntry> {
         &listing.metadata
     }
-
-    /// Get order details by its ID
-    /// @return buyer, seller, token amount, price, fee amount, expiry, status, created time, payment status, order ID
     public fun get_order_by_id<CoinType>(order: &Order<CoinType>): (address, address, u64, u64, u64, u64, u8, u64, bool, bool, ID) {
         (
             order.buyer,
@@ -960,19 +1008,12 @@ module escrow::marketplace {
             object::id(order)
         )
     }
-
-    /// Get order metadata
     public fun get_order_metadata<CoinType>(order: &Order<CoinType>): &vector<MetadataEntry> {
         &order.metadata
     }
-
-    /// Get listing ID associated with an order
     public fun get_order_listing_id<CoinType>(order: &Order<CoinType>): ID {
         order.listing_id
     }
-
-    /// Get dispute details by its ID
-    /// @return order ID, buyer, seller, token amount, price, status, created time, dispute ID
     public fun get_dispute_by_id<CoinType>(dispute: &Dispute<CoinType>): (ID, address, address, u64, u64, u8, u64, ID) {
         (
             dispute.order_id,
@@ -985,14 +1026,377 @@ module escrow::marketplace {
             object::id(dispute)
         )
     }
-
-    /// Get buyer's reason for dispute
     public fun get_dispute_buyer_reason<CoinType>(dispute: &Dispute<CoinType>): &vector<u8> {
         &dispute.buyer_reason
     }
-
-    /// Get seller's response to dispute
     public fun get_dispute_seller_response<CoinType>(dispute: &Dispute<CoinType>): &vector<u8> {
         &dispute.seller_response
+    }
+
+    /// Function to create a buy advertisement
+    public entry fun create_buy_advert<CoinType>(
+        config: &EscrowConfig,
+        registry: &TokenRegistry,
+        token_amount: u64,         // Total amount merchant wants to buy
+        offered_price: u64,        // Price per token unit merchant is offering
+        min_sell_amount: u64,      // Minimum amount per sale
+        max_sell_amount: u64,      // Maximum amount per sale
+        expiry: u64,               // Duration in seconds until advert expires
+        metadata_keys: vector<vector<u8>>,
+        metadata_values: vector<vector<u8>>,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        // Ensure parameters are valid
+        assert!(token_amount > 0, EInvalidAmount);
+        assert!(offered_price > 0, EInvalidAmount);
+        assert!(min_sell_amount > 0 && max_sell_amount >= min_sell_amount, EInvalidParameters);
+        assert!(token_amount >= min_sell_amount, EInvalidParameters);
+        assert!(expiry >= config.min_expiry && expiry <= config.max_expiry, EInvalidParameters);
+
+        // Check metadata constraints
+        assert!(vector::length(&metadata_keys) == vector::length(&metadata_values), EInvalidParameters);
+        assert!(vector::length(&metadata_keys) <= MAX_METADATA_ENTRIES, EMetadataTooLarge);
+
+        // Check token type is supported and active
+        let token_type = type_name::get<CoinType>();
+        let (found, token_info) = get_token_info(&registry.tokens, token_type);
+        assert!(found, ETokenNotFound);
+        assert!(token_info.is_active, EInvalidParameters);
+        assert!(token_amount >= token_info.min_amount && token_amount <= token_info.max_amount, EInvalidAmount);
+
+        // Convert flat metadata vectors to structured metadata
+        let mut metadata = vector::empty<MetadataEntry>();
+        let mut i = 0;
+        let len = vector::length(&metadata_keys);
+
+        while (i < len) {
+            let key = *vector::borrow(&metadata_keys, i);
+            let value = *vector::borrow(&metadata_values, i);
+            add_metadata(&mut metadata, key, value);
+            i = i + 1;
+        };
+
+        let now = clock::timestamp_ms(clock) / 1000;
+        let buyer = tx_context::sender(ctx);
+
+        // Create the buy advertisement
+        let advert = BuyAdvert<CoinType> {
+            id: object::new(ctx),
+            buyer,
+            token_amount,
+            remaining_amount: token_amount,
+            offered_price,
+            min_sell_amount,
+            max_sell_amount,
+            expiry: now + expiry,
+            created_at: now,
+            status: LISTING_ACTIVE, // Reusing listing status constants
+            metadata,
+        };
+
+        event::emit(BuyAdvertCreatedEvent {
+            advert_id: object::id(&advert),
+            buyer: advert.buyer,
+            token_amount: advert.token_amount,
+            offered_price: advert.offered_price,
+            expiry: advert.expiry,
+        });
+
+        // Share the object
+        transfer::share_object(advert);
+    }
+
+    // Merchant can cancel their own buy advertisement
+    public entry fun cancel_buy_advert<CoinType>(
+        advert: &mut BuyAdvert<CoinType>,
+        ctx: &mut TxContext
+    ) {
+        let sender = tx_context::sender(ctx);
+        assert!(sender == advert.buyer, ENotOwner);
+        assert!(advert.status == LISTING_ACTIVE || advert.status == LISTING_PARTIALLY_SOLD, EInvalidListing);
+
+        // Mark as canceled
+        advert.status = LISTING_CANCELED;
+
+        event::emit(BuyAdvertCanceledEvent { 
+            advert_id: object::id(advert), 
+            by: sender 
+        });
+    }
+
+    // Seller creates a sale order in response to a buy advertisement
+    public entry fun create_sale_order<CoinType>(
+        advert: &mut BuyAdvert<CoinType>,
+        mut token_coin: Coin<CoinType>,  // The tokens the seller is selling
+        token_amount: u64,           // Amount to sell
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let now = clock::timestamp_ms(clock) / 1000;
+        let seller = tx_context::sender(ctx);
+
+        // First check: Prevent buyer from selling to themselves
+        assert!(seller != advert.buyer, ESelfTrading);
+
+        // Verify the advert is still valid
+        assert!(now <= advert.expiry, EOrderExpired);
+        assert!(advert.status == LISTING_ACTIVE || advert.status == LISTING_PARTIALLY_SOLD, EInvalidListing);
+
+        // Verify the requested amount is valid
+        assert!(token_amount >= advert.min_sell_amount, EInvalidAmount);
+        assert!(token_amount <= advert.max_sell_amount, EInvalidAmount);
+        assert!(token_amount <= advert.remaining_amount, EInsufficientTokensInListing);
+
+        // Verify the seller has enough tokens
+        let coin_value = coin::value(&token_coin);
+        assert!(coin_value >= token_amount, EInsufficientFunds);
+
+        // Create an empty vector for metadata
+        let mut metadata = vector::empty();
+
+        // Copy relevant metadata from the advert
+        copy_metadata(&advert.metadata, &mut metadata);
+
+        // Take specified amount of tokens from the seller's coin
+        let escrowed_token_balance;
+        if (coin_value == token_amount) {
+            // If exact amount, convert whole coin to balance
+            escrowed_token_balance = coin::into_balance(token_coin);
+        } else {
+            // Otherwise, split the coin
+            let split_coin = coin::split(&mut token_coin, token_amount, ctx);
+            escrowed_token_balance = coin::into_balance(split_coin);
+            // Return remaining tokens to seller
+            transfer::public_transfer(token_coin, seller);
+        };
+
+        // Update the remaining amount in the advert
+        advert.remaining_amount = advert.remaining_amount - token_amount;
+
+        // Update advert status based on remaining tokens
+        if (advert.remaining_amount == 0) {
+            advert.status = LISTING_SOLD;
+        } else {
+            advert.status = LISTING_PARTIALLY_SOLD;
+
+            // Emit event for partial fill
+            event::emit(BuyAdvertUpdatedEvent {
+                advert_id: object::id(advert),
+                remaining_amount: advert.remaining_amount,
+            });
+        };
+
+        // Calculate total price for the sold amount (offered price per token * token amount)
+        let total_price = advert.offered_price * token_amount;
+        
+        // Calculate fee (same fee structure as regular orders)
+        let fee_amount = (token_amount * PLATFORM_FEE_PERCENT) / 10000;
+
+        let sale_order = SaleOrder<CoinType> {
+            id: object::new(ctx),
+            seller,
+            buyer: advert.buyer,
+            token_amount,
+            price: total_price,
+            fee_amount,
+            expiry: now + 3600, // Fixed 1-hour order expiry like regular orders
+            status: STATUS_ACTIVE,
+            created_at: now,
+            escrowed_coin: escrowed_token_balance,
+            payment_made: false,
+            payment_received: false,
+            metadata,
+            advert_id: object::id(advert),
+        };
+
+        event::emit(SaleOrderCreatedEvent {
+            order_id: object::id(&sale_order),
+            advert_id: object::id(advert),
+            seller: sale_order.seller,
+            buyer: sale_order.buyer,
+            token_amount: sale_order.token_amount,
+            price: sale_order.price,
+            expiry: sale_order.expiry,
+        });
+
+        transfer::share_object(sale_order);
+    }
+
+    // Buyer (merchant) marks payment as made
+    public entry fun mark_sale_payment_made<CoinType>(
+        sale_order: &mut SaleOrder<CoinType>,
+        ctx: &mut TxContext
+    ) {
+        assert!(tx_context::sender(ctx) == sale_order.buyer, ENotOwner);
+        assert!(sale_order.status == STATUS_ACTIVE, EOrderNotOpen);
+
+        // Validate state transition
+        assert!(validate_order_status_change(sale_order.status, STATUS_PAYMENT_MADE), EInvalidStateTransition);
+
+        sale_order.payment_made = true;
+        sale_order.status = STATUS_PAYMENT_MADE;
+
+        event::emit(PaymentMadeEvent {
+            order_id: object::id(sale_order),
+            by: sale_order.buyer,
+        });
+    }
+
+    // Seller confirms payment received and tokens are released to the buyer (merchant)
+    public entry fun mark_sale_payment_received<CoinType>(
+        config: &EscrowConfig,
+        sale_order: &mut SaleOrder<CoinType>,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        assert!(tx_context::sender(ctx) == sale_order.seller, ENotOwner);
+        assert!(sale_order.status == STATUS_PAYMENT_MADE, EPaymentNotMade);
+        assert!(clock::timestamp_ms(clock) / 1000 <= sale_order.expiry, EOrderExpired);
+
+        // Validate state transition
+        assert!(validate_order_status_change(sale_order.status, STATUS_COMPLETED), EInvalidStateTransition);
+
+        sale_order.payment_received = true;
+        sale_order.status = STATUS_COMPLETED;
+
+        // Calculate amounts
+        let total_amount = balance::value(&sale_order.escrowed_coin);
+        assert!(total_amount >= sale_order.fee_amount, EInsufficientFunds);
+        let buyer_amount = total_amount - sale_order.fee_amount;
+
+        // Transfer fee to platform
+        let fee_coin = coin::take(&mut sale_order.escrowed_coin, sale_order.fee_amount, ctx);
+        transfer::public_transfer(fee_coin, config.fee_collector);
+
+        // Transfer remaining tokens to buyer
+        refund_balance(&mut sale_order.escrowed_coin, sale_order.buyer, ctx);
+
+        event::emit(PaymentReceivedEvent {
+            order_id: object::id(sale_order),
+            by: sale_order.seller,
+        });
+
+        event::emit(OrderCompletedEvent {
+            order_id: object::id(sale_order),
+            buyer_received: buyer_amount,
+            fee_collected: sale_order.fee_amount,
+        });
+    }
+
+    // Seller can cancel the sale order before expiry
+    public entry fun cancel_sale_order<CoinType>(
+        sale_order: &mut SaleOrder<CoinType>,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        let sender = tx_context::sender(ctx);
+
+        // Only seller can cancel sale orders
+        assert!(sender == sale_order.seller, ENotOwner);
+
+        // Order must be active or in payment made status
+        assert!(sale_order.status == STATUS_ACTIVE || sale_order.status == STATUS_PAYMENT_MADE, EOrderNotOpen);
+
+        // Check that order has not expired
+        assert!(clock::timestamp_ms(clock) / 1000 <= sale_order.expiry, EOrderExpired);
+
+        // Validate state transition
+        assert!(validate_order_status_change(sale_order.status, STATUS_CANCELED), EInvalidStateTransition);
+
+        sale_order.status = STATUS_CANCELED;
+
+        // Refund escrowed tokens to seller
+        refund_balance(&mut sale_order.escrowed_coin, sale_order.seller, ctx);
+
+        event::emit(OrderCanceledEvent {
+            order_id: object::id(sale_order),
+            by: sender,
+        });
+    }
+
+    // Process an expired sale order
+    public entry fun process_expired_sale_order<CoinType>(
+        sale_order: &mut SaleOrder<CoinType>,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ) {
+        assert!(clock::timestamp_ms(clock) / 1000 > sale_order.expiry, EOrderNotExpired);
+        assert!(sale_order.status == STATUS_ACTIVE || sale_order.status == STATUS_PAYMENT_MADE, EOrderNotOpen);
+
+        // Validate state transition
+        assert!(validate_order_status_change(sale_order.status, STATUS_EXPIRED), EInvalidStateTransition);
+
+        sale_order.status = STATUS_EXPIRED;
+
+        // Return escrowed tokens to seller
+        refund_balance(&mut sale_order.escrowed_coin, sale_order.seller, ctx);
+
+        event::emit(OrderExpiredEvent {
+            order_id: object::id(sale_order),
+        });
+    }
+
+    // Admin can force cancel any sale order
+    public entry fun admin_force_cancel_sale_order<CoinType>(
+        _: &AdminCap,
+        sale_order: &mut SaleOrder<CoinType>,
+        ctx: &mut TxContext
+    ) {
+        // Order must not be already completed or canceled
+        assert!(sale_order.status != STATUS_COMPLETED && sale_order.status != STATUS_CANCELED, EOrderNotOpen);
+
+        sale_order.status = STATUS_CANCELED;
+
+        // Return escrowed tokens to seller
+        refund_balance(&mut sale_order.escrowed_coin, sale_order.seller, ctx);
+
+        event::emit(OrderCanceledEvent {
+            order_id: object::id(sale_order),
+            by: tx_context::sender(ctx),
+        });
+    }
+
+    // Query functions for buy adverts and sale orders
+    public fun get_buy_advert_by_id<CoinType>(advert: &BuyAdvert<CoinType>): (address, u64, u64, u64, u64, u64, u64, u8, ID) {
+        (
+            advert.buyer,
+            advert.token_amount,
+            advert.remaining_amount,
+            advert.offered_price,
+            advert.min_sell_amount,
+            advert.max_sell_amount,
+            advert.expiry,
+            advert.status,
+            object::id(advert)
+        )
+    }
+
+    public fun get_sale_order_by_id<CoinType>(sale_order: &SaleOrder<CoinType>): (address, address, u64, u64, u64, u64, u8, u64, bool, bool, ID) {
+        (
+            sale_order.seller,
+            sale_order.buyer,
+            sale_order.token_amount,
+            sale_order.price,
+            sale_order.fee_amount,
+            sale_order.expiry,
+            sale_order.status,
+            sale_order.created_at,
+            sale_order.payment_made,
+            sale_order.payment_received,
+            object::id(sale_order)
+        )
+    }
+
+    public fun get_sale_order_advert_id<CoinType>(sale_order: &SaleOrder<CoinType>): ID {
+        sale_order.advert_id
+    }
+
+    public fun get_buy_advert_metadata<CoinType>(advert: &BuyAdvert<CoinType>): &vector<MetadataEntry> {
+        &advert.metadata
+    }
+
+    public fun get_sale_order_metadata<CoinType>(sale_order: &SaleOrder<CoinType>): &vector<MetadataEntry> {
+        &sale_order.metadata
     }
 }

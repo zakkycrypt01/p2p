@@ -11,6 +11,10 @@ import { useCallback, useState } from "react"
 import { SuiGraphQLClient } from "@mysten/sui/graphql"
 import { graphql } from "@mysten/sui/graphql/schemas/latest"
 import { useToast } from "@/components/ui/use-toast"
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client"
+
+// instantiate sui.js client (testnet)
+const suiJsClient = new SuiClient({ url: getFullnodeUrl("testnet") })
 
 const listingInfoReturn = bcs.struct("ListingInfoReturn", {
   seller: bcs.string(),
@@ -52,7 +56,7 @@ const disputeInfoReturn = bcs.struct("DisputeInfoReturn", {
 const OptionListingInfoReturn = bcs.option(listingInfoReturn)
 const OptionOrderInfoReturn = bcs.option(orderInfoReturn)
 const OptionDisputeInfoReturn = bcs.option(disputeInfoReturn)
-const PACKAGE_ADDRESS = "0x52aac053e77b411e6673d8656a317f4730f2cf6c7d3c891eca69a8b348980d69"
+const PACKAGE_ADDRESS = "0xa5a7a1408879bbcd7826a1a814a73fda2c2d5152cb6c461d37c257953cbd30ed"
 
 const gqlClient = new SuiGraphQLClient({
   url: "https://sui-testnet.mystenlabs.com/graphql",
@@ -120,6 +124,26 @@ const fetchOrderByIdQuery = graphql(`
         asMoveObject { contents { json } }
         previousTransactionBlock { digest }
         status
+      }
+    }
+  }
+`)
+
+// Query to fetch all buy adverts
+const fetchBuyAdvertsQuery = graphql(`
+  query FetchBuyAdverts {
+    objects(
+      filter: { type: "${PACKAGE_ADDRESS}::marketplace::BuyAdvert" }
+      first: 20
+    ) {
+      nodes {
+        address
+        previousTransactionBlock { digest }
+        asMoveObject {
+          contents {
+            json
+          }
+        }
       }
     }
   }
@@ -406,6 +430,68 @@ async function getOrderByOrderId(orderId: string): Promise<any | null> {
     console.error("Error fetching order by ID:", error)
     return null
   }
+}
+
+async function getAllBuyAdverts() {
+  const resp = await gqlClient.query({ query: fetchBuyAdvertsQuery })
+  type FetchBuyAdvertsResult = {
+    data: {
+      objects: {
+        nodes: Array<{
+          address: string
+          previousTransactionBlock: { digest: string }
+          asMoveObject: {
+            contents: {
+              json: {
+                id: string
+                buyer: string
+                token_amount: string
+                remaining_amount: string
+                offered_price: string
+                min_sell_amount: string
+                max_sell_amount: string
+                expiry: string
+                created_at: string
+                status: number
+                metadata?: Array<{ key: number[]; value: number[] }>
+              }
+            }
+          }
+        }>
+      }
+    }
+  }
+
+  const nodes = (resp as unknown as FetchBuyAdvertsResult).data.objects.nodes
+  return nodes
+    .map((node) => {
+      const j = node.asMoveObject.contents.json
+      // parse metadata
+      const meta: Record<string, string> = {}
+      if (Array.isArray(j.metadata)) {
+        j.metadata.forEach(({ key, value }) => {
+          const k = new TextDecoder().decode(new Uint8Array(key))
+          const v = new TextDecoder().decode(new Uint8Array(value))
+          meta[k] = v
+        })
+      }
+
+      return {
+        id: node.address,
+        buyer: j.buyer,
+        tokenAmount: BigInt(j.token_amount),
+        remainingAmount: BigInt(j.remaining_amount),
+        offeredPrice: BigInt(j.offered_price),
+        minSellAmount: BigInt(j.min_sell_amount),
+        maxSellAmount: BigInt(j.max_sell_amount),
+        expiry: Number(j.expiry),
+        createdAt: Number(j.created_at),
+        status: j.status,
+        metadata: meta,
+        transactionDigest: node.previousTransactionBlock.digest,
+      }
+    })
+    .filter((x) => x != null)
 }
 
 export function useContract() {
@@ -1208,6 +1294,268 @@ export function useContract() {
     return -1 // Error case
   }
 
+  // Create a buy advertisement
+  interface CreateBuyAdvertParams {
+    tokenAmount: number
+    offeredPrice: number
+    minSellAmount: number
+    maxSellAmount: number
+    expiry: number
+    metadataKeys?: string[]
+    metadataValues?: string[]
+  }
+  const createBuyAdvert = async ({
+    tokenAmount,
+    offeredPrice,
+    minSellAmount,
+    maxSellAmount,
+    expiry,
+    metadataKeys = [],
+    metadataValues = [],
+  }: CreateBuyAdvertParams): Promise<Transaction> => {
+    toast({
+      title: "Creating buy advert",
+      description: "Please confirm in your wallet",
+      variant: "default",
+    })
+
+    const tx = new Transaction()
+
+    // serialize metadata
+    const encodeVec = (arr: string[]) =>
+      bcs.vector(bcs.vector(bcs.u8())).serialize(
+        arr.map((s) => Array.from(new TextEncoder().encode(s)))
+      )
+    const keysVec = encodeVec(metadataKeys)
+    const valsVec = encodeVec(metadataValues)
+
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::create_buy_advert`,
+      typeArguments: ["0x2::sui::SUI"],
+      arguments: [
+        tx.object(EscrowConfigObjectId),
+        tx.object(TokenRegistryObjectId),
+        tx.pure.u64(tokenAmount),
+        tx.pure.u64(offeredPrice),
+        tx.pure.u64(minSellAmount),
+        tx.pure.u64(maxSellAmount),
+        tx.pure.u64(expiry),
+        tx.pure(keysVec),
+        tx.pure(valsVec),
+        tx.object(SUI_CLOCK_OBJECT_ID),
+      ],
+    })
+
+    return tx
+  }
+
+  // Cancel a buy advertisement
+  const cancelBuyAdvert = async (advertId: string): Promise<string | null> => {
+    toast({
+      title: "Cancelling buy advert",
+      description: "Please confirm in your wallet",
+      variant: "default",
+    })
+    const tx = new Transaction()
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::cancel_buy_advert`,
+      arguments: [tx.object(advertId)],
+    })
+    return handleTransaction(tx)
+  }
+
+  // Create a sale order in response to a buy advert
+  interface CreateSaleOrderParams {
+    advertId: string
+    tokenCoin: string
+    tokenAmount: number
+  }
+  const createSaleOrder = async ({
+    advertId,
+    tokenCoin,
+    tokenAmount,
+  }: CreateSaleOrderParams): Promise<string | null> => {
+    toast({
+      title: "Creating sale order",
+      description: "Please confirm in your wallet",
+      variant: "default",
+    })
+    const tx = new Transaction()
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::create_sale_order`,
+      typeArguments: ["0x2::sui::SUI"],
+      arguments: [
+        tx.object(advertId),
+        tx.object(tokenCoin),
+        tx.pure.u64(tokenAmount),
+        tx.object(SUI_CLOCK_OBJECT_ID),
+      ],
+    })
+    return handleTransaction(tx)
+  }
+
+  // Buyer (merchant) marks sale payment made
+  const markSalePaymentMade = async (saleOrderId: string): Promise<string | null> => {
+    toast({
+      title: "Marking sale payment made",
+      description: "Please confirm in your wallet",
+      variant: "default",
+    })
+    const tx = new Transaction()
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::mark_sale_payment_made`,
+      arguments: [tx.object(saleOrderId)],
+    })
+    return handleTransaction(tx)
+  }
+
+  // Seller confirms sale payment received
+  const markSalePaymentReceived = async (saleOrderId: string): Promise<string | null> => {
+    toast({
+      title: "Marking sale payment received",
+      description: "Please confirm in your wallet",
+      variant: "default",
+    })
+    const tx = new Transaction()
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::mark_sale_payment_received`,
+      typeArguments: ["0x2::sui::SUI"],
+      arguments: [tx.object(EscrowConfigObjectId), tx.object(saleOrderId), tx.object(SUI_CLOCK_OBJECT_ID)],
+    })
+    return handleTransaction(tx)
+  }
+
+  // Cancel a sale order
+  const cancelSaleOrder = async (saleOrderId: string): Promise<string | null> => {
+    toast({
+      title: "Cancelling sale order",
+      description: "Please confirm in your wallet",
+      variant: "default",
+    })
+    const tx = new Transaction()
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::cancel_sale_order`,
+      arguments: [tx.object(saleOrderId), tx.object(SUI_CLOCK_OBJECT_ID)],
+    })
+    return handleTransaction(tx)
+  }
+
+  // Process expired sale order
+  const processExpiredSaleOrder = async (saleOrderId: string): Promise<string | null> => {
+    toast({
+      title: "Processing expired sale order",
+      description: "Please confirm in your wallet",
+      variant: "default",
+    })
+    const tx = new Transaction()
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::process_expired_sale_order`,
+      arguments: [tx.object(saleOrderId), tx.object(SUI_CLOCK_OBJECT_ID)],
+    })
+    return handleTransaction(tx)
+  }
+
+  // Admin force-cancel sale order
+  const adminForceCancelSaleOrder = async (saleOrderId: string): Promise<string | null> => {
+    toast({
+      title: "Force-cancelling sale order (admin)",
+      description: "Please confirm in your wallet",
+      variant: "default",
+    })
+    const tx = new Transaction()
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::admin_force_cancel_sale_order`,
+      arguments: [tx.object(SUI_CLOCK_OBJECT_ID), tx.object(saleOrderId)],
+    })
+    return handleTransaction(tx)
+  }
+
+  // View: get buy-advert by ID
+  const getBuyAdvertById = async (advertId: string): Promise<any | null> => {
+    const tx = new Transaction()
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::get_buy_advert_by_id`,
+      typeArguments: ["0x2::sui::SUI"],
+      arguments: [tx.object(advertId)],
+    })
+    const result = await suiClient.devInspectTransactionBlock({
+      transactionBlock: tx,
+      sender: currentAccount?.address || "0x0",
+    })
+    const rv = result.results?.[0]?.returnValues?.[0]?.[0]
+    if (!rv) return null
+    const [buyer, token_amount, remaining, offered_price, min_sell, max_sell, expiry, status, id] =
+      bcs
+        .tuple([
+          bcs.string(),
+          bcs.u64(),
+          bcs.u64(),
+          bcs.u64(),
+          bcs.u64(),
+          bcs.u64(),
+          bcs.u64(),
+          bcs.u8(),
+          bcs.string(),
+        ])
+        .parse(new Uint8Array(rv))
+    return {
+      buyer,
+      tokenAmount: BigInt(token_amount.toString()),
+      remainingAmount: BigInt(remaining.toString()),
+      offeredPrice: BigInt(offered_price.toString()),
+      minSellAmount: BigInt(min_sell.toString()),
+      maxSellAmount: BigInt(max_sell.toString()),
+      expiry: Number(expiry),
+      status: Number(status),
+      id,
+    }
+  }
+
+  // View: get sale-order by ID
+  const getSaleOrderById = async (orderId: string): Promise<any | null> => {
+    const tx = new Transaction()
+    tx.moveCall({
+      target: `${MarketplacePackageId}::${MODULE_NAME}::get_sale_order_by_id`,
+      typeArguments: ["0x2::sui::Sui"],
+      arguments: [tx.object(orderId)],
+    })
+    const result = await suiClient.devInspectTransactionBlock({
+      transactionBlock: tx,
+      sender: currentAccount?.address || "0x0",
+    })
+    const rv = result.results?.[0]?.returnValues?.[0]?.[0]
+    if (!rv) return null
+    const [seller, buyer, token_amount, price, fee_amount, expiry, status, created_at, pm, pr, id] =
+      bcs
+        .tuple([
+          bcs.string(), // seller
+          bcs.string(), // buyer
+          bcs.u64(),
+          bcs.u64(),
+          bcs.u64(),
+          bcs.u64(),
+          bcs.u8(),
+          bcs.u64(),
+          bcs.bool(),
+          bcs.bool(),
+          bcs.string(),
+        ])
+        .parse(new Uint8Array(rv))
+    return {
+      seller,
+      buyer,
+      tokenAmount: BigInt(token_amount.toString()),
+      price: BigInt(price.toString()),
+      feeAmount: BigInt(fee_amount.toString()),
+      expiry: Number(expiry),
+      status: Number(status),
+      createdAt: Number(created_at),
+      paymentMade: pm,
+      paymentReceived: pr,
+      id,
+    }
+  }
+
   return {
     // Existing mutation functions
     createListing,
@@ -1226,7 +1574,21 @@ export function useContract() {
     getListingStatus,
     isTokenSupported,
 
+    // New mutation functions
+    createBuyAdvert,
+    cancelBuyAdvert,
+    createSaleOrder,
+    markSalePaymentMade,
+    markSalePaymentReceived,
+    cancelSaleOrder,
+    processExpiredSaleOrder,
+    adminForceCancelSaleOrder,
+
     // New query functions
+    getBuyAdvertById,
+    getSaleOrderById,
+
+    // Other query functions
     getListingById,
     getOrderById,
     getDisputeById,
@@ -1241,6 +1603,7 @@ export function useContract() {
     getOrdersByBuyer,
     getOrdersBySeller,
     getOrderByOrderId,
+    getAllBuyAdverts,
 
     // drip state
     isDrippingGas,

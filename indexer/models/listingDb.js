@@ -55,6 +55,14 @@ const listingSchema = new Schema({
         type: Number,
         default: 0
     },
+    buyerAddress: {
+        type: String,
+        required: false
+    },
+    buyerRating: {
+        type: Number,
+        default: 0
+    },
     description: {
         type: String,
         default: ""

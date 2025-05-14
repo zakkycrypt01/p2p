@@ -82,9 +82,9 @@ export function NavigationMenu({ address, onClose }: NavigationMenuProps) {
               </Link>
             </Button>
             <Button asChild variant="ghost" className="w-full justify-start" onClick={handleNavigation}>
-              <Link href="/swap">
+              <Link href="/bridge">
                 <RefreshCw className="h-5 w-5 mr-2" />
-                Swap
+                Bridge
               </Link>
             </Button>
             <Button asChild variant="ghost" className="w-full justify-start" onClick={handleNavigation}>

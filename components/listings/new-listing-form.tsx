@@ -72,7 +72,7 @@ export function NewListingForm() {
   const coinObjectId = useSuiWallet()
   const currentAccount = useCurrentAccount()
   const connected = useSuiWallet()
-  const {createListing} = useContract()
+  const {createListing ,createBuyAdvert} = useContract()
   const address = currentAccount?.address
   const { executeTransaction } = useSubmitTransaction()
   
@@ -147,7 +147,7 @@ export function NewListingForm() {
       paymentMethods: [],
       minAmount: 0.00,
       maxAmount: 0.00,
-      paymentWindow: 30,
+      paymentWindow: 86400,                               
       description: "",
     },
   })
@@ -237,8 +237,56 @@ export function NewListingForm() {
     setIsSubmitting(true)
 
     try {
+      //update metadata with form values before processing
+      const updatedMetadata = [
+        { key: 'description', value: values.description || '' },
+        { key: 'paymentMethods', value: values.paymentMethods.join(',') },
+        ];
+      const metadataKeys = updatedMetadata.map((item) => item.key).filter(key => key.trim() !== '');
+      const metadataValues = updatedMetadata
+        .filter(item => item.key.trim() !== '')
+        .map((item) => item.value);
+      const tokenDecimalPlaces = 9;
+      const tokenAmount = BigInt(Math.floor(values.amount * (10 ** tokenDecimalPlaces)));
+      const price = BigInt(Math.round(values.price * 100));
+      const minAmount = BigInt(Math.floor(values.minAmount * (10 ** tokenDecimalPlaces)));
+      const maxAmount = BigInt(Math.floor(values.maxAmount * (10 ** tokenDecimalPlaces)));
+      console.log("Creating buy listing with:", {
+        token: values.token,
+        amount: tokenAmount.toString(),
+        price: price.toString(),
+        expiry: values.paymentWindow,
+        minAmount: minAmount.toString(),
+        maxAmount: maxAmount.toString(),
+      });
+
+      const params = {
+        tokenAmount: Number(tokenAmount),
+        offeredPrice: Number(price),
+        minSellAmount: Number(minAmount),
+        maxSellAmount: Number(maxAmount),
+        expiry: values.paymentWindow,
+        metadataKeys,
+        metadataValues,
+      };
+
+      const tx = await createBuyAdvert(params);
+      if (tx === null) {
+        throw new Error("Failed to build buy advert transaction");
+      }
+
+      await executeTransaction(tx, {
+        successMessage: "Buy listing created!",
+        errorMessage: "Failed to create listing",
+        onSuccess: () => {
+          toast({
+            title: "Buy listing created successfully",
+            description: "Your listing has been published to the order book",
+          });
+          router.push("/dashboard");
+        },
+      });
       console.log("Creating buy listing on-chain:", values)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
       console.log("Posting listing metadata to API")
 
       toast({
@@ -642,7 +690,7 @@ export function NewListingForm() {
                       <FormItem>
                         <FormLabel>Payment Window (minutes)</FormLabel>
                         <FormControl>
-                          <Input type="number" min="5" max="180" {...field} />
+                          <Input type="number" min="5" max="180000" {...field} />
                         </FormControl>
                         <FormDescription>Time you'll have to complete payment</FormDescription>
                         <FormMessage />

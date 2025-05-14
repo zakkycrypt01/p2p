@@ -48,15 +48,138 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
   const [listings, setListings] = useState<Listing[]>([])
   const [fetchedListings, setFetchedListings] = useState<Listing[]>([]);
   const [fetchedListingsFromDb, setFetchedListingsFromDb] = useState<any[]>([]);
+  const [fetchedAds, setFetchedAds] = useState<any[]>([]);
 
   const [filters, setFilters] = useState<ListingFilters>({
     orderType: defaultOrderType,
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
-  const { getAllListings } = useContract()
+  const { getAllListings,getAllBuyAdverts } = useContract()
   const { address } = useSuiWallet()
   const fetchAttemptedRef = useRef(false)
+  const adsFetchAttemptRef = useRef(false)
+
+  useEffect (()=>{
+    if (!adsFetchAttemptRef.current && address) {
+      adsFetchAttemptRef.current = true
+      const fetchAds = async () => {
+        try {
+          const rawAds = await getAllBuyAdverts()
+          console.log('Raw Ads:', rawAds)
+            const mappedAds = rawAds.map((ad: any) => {
+            const metadataObj = ad.metadata || {}
+            return {
+              id: ad.id || "",
+              ownerAddress: ad.buyer || "",
+              transactionDigest: ad.transactionDigest,
+              price: Number(ad.offeredPrice) || 0,
+              remainingAmount: ad.remainingAmount,
+              createdAt: ad.createdAt ? Number(ad.createdAt) : undefined,
+              expiry: typeof ad.expiry === "number" ? ad.expiry : undefined,
+              status: (() => {
+              switch (ad.status) {
+                case 0:
+                return "Active";
+                case 1:
+                return "Sold";
+                case 2:
+                return "Partially Sold";
+                case 3:
+                return "Canceled";
+                case 4:
+                return "Expired";
+                default:
+                return "Unknown";
+              }
+              })(),
+              description: metadataObj.description || "",
+              paymentMethod: metadataObj.paymentMethods || "",
+              minAmount: ad?.minSellAmount !== undefined ? Number(ad.minSellAmount) : undefined,
+              maxAmount: ad?.maxSellAmount !== undefined ? Number(ad.maxSellAmount) : undefined,
+            }
+            })
+            console.log('Mapped Ads:', mappedAds);
+            setFetchedAds(mappedAds)
+        } catch (err) {
+          console.error('Error fetching listings:', err)
+        }
+      }
+      fetchAds()
+    }
+  },[address, getAllBuyAdverts])
+  const digests = fetchedAds.map((ad) => ad.transactionDigest);
+  const [adTokenSymbol, setAdTokenSymbol] = useState<string[]>([])
+  const [adTokenIcon, setAdTokenIcon]     = useState<string[]>([])
+  useEffect(() => {
+    const fetchAndSetAdTokenDetails = async () => {
+      const details = await Promise.all(
+        fetchedAds.map(async (ad) => {
+          const info = ad.transactionDigest
+            ? await fetchTokenDetails(ad.transactionDigest)
+            : null
+            console.log('Fetched token details:', info);
+            return {
+            symbol: info?.symbol || "Unknown",
+            icon:   info?.icon   || "https://res.cloudinary.com/dh0hcpmzk/image/upload/v1744934236/sui_p6ug5f.png",
+            }
+        })
+      )
+      setAdTokenSymbol(details.map((d) => d.symbol))
+      setAdTokenIcon(details.map((d) => d.icon))
+    }
+
+    if (fetchedAds.length > 0) {
+      fetchAndSetAdTokenDetails()
+    }
+  }, [fetchedAds])
+  useEffect(() => {
+    const fetchAndSetAdTokenDetails = async () => {
+      const details = await Promise.all(
+        fetchedAds.map(async (ad) => {
+          const info = ad.transactionDigest
+            ? await fetchTokenDetails(ad.transactionDigest)
+            : null
+            console.log('Fetched token details:', info);
+            return {
+              id: ad.id,
+            tokenSymbol: info?.symbol || "Unknown",
+            tokenIcon:   info?.icon   || "https://res.cloudinary.com/dh0hcpmzk/image/upload/v1744934236/sui_p6ug5f.png",
+            amount: info?.decimals !== undefined 
+              ? Number(ad.remainingAmount) / (10 ** info.decimals) 
+              : Number(ad.remainingAmount) / (10 ** 9),
+            price: ad.price / 100,
+            fiatCurrency: 'USD',
+            paymentMethod: ad.paymentMethod || "Unknown",
+            createdAt: ad.createdAt 
+              ? new Date(Number(ad.createdAt) * 1000).toISOString()
+              : "Unknown",
+            orderType: "sell",
+            address: ad.ownerAddress,
+            buyerAddress: ad.ownerAddress,
+            buyerRating: 0,
+            description: ad.description || "No description provided",
+            minAmount: ad.minAmount !== undefined
+              ? ad.minAmount / (10 ** (info?.decimals ?? 0))
+              : undefined,
+            maxAmount: ad.maxAmount !== undefined
+              ? ad.maxAmount / (10 ** (info?.decimals ?? 0))
+              : undefined,
+            expiry: ad.expiry? new Date(Number(ad.expiry) * 1000).toISOString()
+            : "Unknown",
+            status: ad.status || "Unknown",
+            }
+        })
+      )
+      setAdTokenSymbol(details.map((d) => d.tokenSymbol))
+      setAdTokenIcon(details.map((d) => d.tokenIcon))
+      console.log('Fetched ads settable details:', details);
+    }
+    if (fetchedAds.length > 0) {
+      fetchAndSetAdTokenDetails()
+    }
+  }
+  , [fetchedAds])
 
   useEffect(() => {
     if (!fetchAttemptedRef.current && address) {
@@ -414,4 +537,5 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
     refreshListings: fetchListings,
   }
 }
+
 

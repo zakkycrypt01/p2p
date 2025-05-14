@@ -59,10 +59,10 @@ export function Navbar() {
                 Dashboard
                 </Link>
                 <Link
-                href="/swap"
-                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/swap" ? "text-primary" : "text-foreground/60"}`}
+                href="/bridge"
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/bridge" ? "text-primary" : "text-foreground/60"}`}
                 >
-                Swap
+                Bridge
                 </Link>
             </nav>
           )}
