@@ -345,11 +345,11 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
          if (!match) continue;
          
          const coinType = match[1];
-         // console.log(`Extracted coin type from coin object: ${coinType}`);
+         console.log(`Extracted coin type from coin object: ${coinType}`);
          
          try {
            const metadata = await client.getCoinMetadata({ coinType });
-           // console.log(`Metadata for ${coinType}:`, metadata);
+          //  console.log(`Metadata for ${coinType}:`, metadata);
            
            if (metadata) {
              return {

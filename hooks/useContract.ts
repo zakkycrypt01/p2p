@@ -1367,31 +1367,57 @@ export function useContract() {
   // Create a sale order in response to a buy advert
   interface CreateSaleOrderParams {
     advertId: string
-    tokenCoin: string
-    tokenAmount: number
+    coinType: string // e.g. "0x2::sui::SUI"
+    tokenAmount: number // amount in u64
   }
+
   const createSaleOrder = async ({
     advertId,
-    tokenCoin,
+    coinType,
     tokenAmount,
-  }: CreateSaleOrderParams): Promise<string | null> => {
-    toast({
-      title: "Creating sale order",
-      description: "Please confirm in your wallet",
-      variant: "default",
+  }: CreateSaleOrderParams): Promise<Transaction> => {
+    if (!currentAccount?.address) {
+      toast({
+        title: "Wallet not connected",
+        description: "Please connect your wallet to continue",
+        variant: "destructive",
+      })
+      throw new Error("No connected wallet")
+    }
+
+    // 1) fetch a coin object of the correct type with enough balance
+    const coins = await suiClient.getCoins({
+      owner: currentAccount.address,
+      coinType,
     })
+    const coinObj = coins.data.find((c) => BigInt(c.balance) >= BigInt(tokenAmount))
+    if (!coinObj) {
+      toast({
+        title: "Insufficient tokens",
+        description: `You need at least ${tokenAmount} of ${coinType}`,
+        variant: "destructive",
+      })
+      throw new Error("Not enough tokens")
+    }
+
     const tx = new Transaction()
+
+    // 2) split exactly the amount you want to sell
+    const [splitCoin] = tx.splitCoins(tx.object(coinObj.coinObjectId), [tx.pure.u64(tokenAmount)])
+
+    // 3) call Move entry
     tx.moveCall({
       target: `${MarketplacePackageId}::${MODULE_NAME}::create_sale_order`,
-      typeArguments: ["0x2::sui::SUI"],
+      typeArguments: [coinType],
       arguments: [
-        tx.object(advertId),
-        tx.object(tokenCoin),
-        tx.pure.u64(tokenAmount),
+        tx.object(advertId), // &mut BuyAdvert
+        splitCoin, // Coin<CoinType>
+        tx.pure.u64(tokenAmount), // u64
         tx.object(SUI_CLOCK_OBJECT_ID),
       ],
     })
-    return handleTransaction(tx)
+
+    return tx
   }
 
   // Buyer (merchant) marks sale payment made

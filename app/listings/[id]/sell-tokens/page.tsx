@@ -17,14 +17,18 @@ import Image from "next/image"
 import { useOrders } from "@/hooks/use-orders"
 import { getListingsById } from "@/actions/getListingsbyId"
 import { useContract } from "@/hooks/useContract"
+import { exec } from "child_process"
+import { useSubmitTransaction } from "@/hooks/useSubmitTransaction"
+
 
 export default function SellTokensPage() {
   const params = useParams()
   const { address } = useSuiWallet()
   const router = useRouter()
   const { toast } = useToast()
-  const { createOrderFromListing } = useContract()
+  const { createSaleOrder } = useContract()
   const { createOrder } = useOrders()
+  const { executeTransaction } = useSubmitTransaction()
 
   const [listing, setListing] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -53,7 +57,6 @@ export default function SellTokensPage() {
     }
   }, [balanceData, isBalanceLoading])
 
-  // Load the listing as before (but remove mockBalance logic)
   useEffect(() => {
     const fetchListing = async () => {
       setIsLoading(true)
@@ -70,16 +73,45 @@ export default function SellTokensPage() {
           router.push(`/listings/${params.id}`)
           return
         }
-        const processedListing = {
+        interface Listing {
+          paymentMethod?: string | string[];
+          amount?: number;
+          minAmount?: number;
+          maxAmount?: number;
+        }
+
+        interface ProcessedListing extends Listing {
+          paymentMethods: string[];
+          totalAmount: number;
+        }
+
+        interface Listing {
+          paymentMethod?: string | string[];
+          amount?: number;
+          minAmount?: number;
+          maxAmount?: number;
+        }
+
+        interface ProcessedListing extends Listing {
+          paymentMethods: string[];
+          totalAmount: number;
+        }
+
+        const processedListing: ProcessedListing = {
           ...listing,
           paymentMethods:
             Array.isArray(listing.paymentMethod)
               ? listing.paymentMethod
               : typeof listing.paymentMethod === "string"
-              ? listing.paymentMethod.split(",").map((method: string) => method.trim())
+              ? listing.paymentMethod.split(",").map((m: string) => m.trim())
               : [],
+          // no longer divide by 1e9 – use the DB’s token amounts directly
           amount: listing.amount || 0,
           totalAmount: listing.amount || 0,
+          minAmount:
+            listing.minAmount != null ? listing.minAmount : undefined,
+          maxAmount:
+            listing.maxAmount != null ? listing.maxAmount : undefined,
         }
         setListing(processedListing)
       } catch (error) {
@@ -123,83 +155,88 @@ export default function SellTokensPage() {
 
   const handleSellTokens = async () => {
     if (!address) {
-      toast({
-        title: "Wallet not connected",
-        description: "Please connect your wallet to sell tokens",
-        variant: "destructive",
-      })
-      return
+      toast({ title: "Wallet not connected", description: "Please connect your wallet", variant: "destructive" });
+      return;
     }
 
-    if (!amount || Number.parseFloat(amount) <= 0) {
-      toast({
-        title: "Invalid amount",
-        description: "Please enter a valid amount",
-        variant: "destructive",
-      })
-      return
+    const sellAmount = parseFloat(amount);
+    if (isNaN(sellAmount) || sellAmount <= 0) {
+      toast({ title: "Invalid amount", description: "Enter a positive number", variant: "destructive" });
+      return;
     }
 
-    if (listing.minAmount && Number.parseFloat(amount) < listing.minAmount) {
+    if (listing.minAmount != null && sellAmount < listing.minAmount) {
       toast({
         title: "Amount too low",
-        description: `The minimum amount is ${listing.minAmount} ${listing.tokenSymbol}`,
+        description: `Minimum is ${listing.minAmount} ${listing.tokenSymbol}`,
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    if (listing.maxAmount && Number.parseFloat(amount) > listing.maxAmount) {
+    if (listing.maxAmount != null && sellAmount > listing.maxAmount) {
       toast({
         title: "Amount too high",
-        description: `The maximum amount is ${listing.maxAmount} ${listing.tokenSymbol}`,
+        description: `Maximum is ${listing.maxAmount} ${listing.tokenSymbol}`,
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    if (walletBalance && Number.parseFloat(amount) > walletBalance) {
+    if (walletBalance != null && sellAmount > walletBalance) {
       toast({
         title: "Insufficient balance",
-        description: `You only have ${walletBalance} ${listing.tokenSymbol} in your wallet`,
+        description: `You only have ${walletBalance.toFixed(4)} ${listing.tokenSymbol}`,
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
-    setIsSubmitting(true)
-
+    setIsSubmitting(true);
     try {
-      const tokenAmount = Number.parseFloat(amount) * Math.pow(10, 9)
-      
-      if (typeof params.id !== "string") {
-        throw new Error("Invalid listing ID");
-      }
-      
-      const tx = await createOrderFromListing({
-        listingId: params.id, 
-        tokenAmount: tokenAmount
-      })
-      
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      
-      toast({
-        title: "Order created",
-        description: "You have successfully created a sell order. Your tokens are now in escrow.",
-      })
+      const listingId = String(params.id);
+      const tokenAmount = Math.floor(sellAmount * 1e9);  
+      const coinTypeArg = listing.coinType || "0x2::sui::SUI";
+      const transactionBlock = await createSaleOrder({
+        advertId: listingId,
+        coinType: coinTypeArg,
+        tokenAmount,
+      });
+      const txDigest = await executeTransaction(transactionBlock, {
+        successMessage: "order created successfully",
+        errorMessage: "Failed to create order",
+        loadingMessage: "Creating order...",
+        onSuccess: () => {
+          toast({
+            title: "Order created",
+            description: `Order created successfully`,
+            variant: "default",
+          });
+        },
+        onError: () => {
+          console.error("Transaction rejected – params:", {
+            listingId,
+            tokenCoin: coinTypeArg,
+            tokenAmount,
+            transactionBlock,
+          });
+        },
+      });
+      if (!txDigest) throw new Error("On-chain transaction failed or was rejected");
 
-      router.push(`/orders/${params.id}`)
-    } catch (error) {
-      console.error("Error creating sell order:", error)
+      toast({ title: "Order created", description: `Tx submitted: ${txDigest}` });
+      router.push(`/orders/${listingId}`);
+    } catch (err: any) {
+      console.error("Error creating sell order:", err);
       toast({
         title: "Failed to create order",
-        description: "There was an error creating this order. Please try again.",
+        description: err.message || "Please try again",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   if (isLoading || !listing) {
     return (
