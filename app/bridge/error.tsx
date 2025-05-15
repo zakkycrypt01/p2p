@@ -19,7 +19,7 @@ export default function Error({
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
-        <h1 className="text-3xl font-bold mb-6 text-white text-center">Token Bridge</h1>
+        <h1 className="text-3xl font-bold mb-6 text-white text-center">SuiXchange Bridge</h1>
 
         <Card className="bg-gray-800 border-gray-700 shadow-xl p-8">
           <div className="text-center">
