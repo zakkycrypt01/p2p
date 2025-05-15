@@ -405,10 +405,10 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
               sellerRating: 0,
               description: listing.description || "No description provided",
               minAmount: Array.isArray(listing.metadata) && listing.metadata[0]?.minAmount !== undefined 
-              ? listing.metadata[0].minAmount / (10 ** (details?.decimals || 0)) 
+              ? listing.metadata[0].minAmount  
               : undefined,
               maxAmount: listing.maxAmount !== undefined 
-              ? listing.maxAmount / (10 ** (details?.decimals || 0)) 
+              ? listing.maxAmount 
               : undefined,
               expiry: listing.expiry? new Date(Number(listing.expiry) * 1000).toISOString()
               : "Unknown",
@@ -455,10 +455,10 @@ export function useListings(defaultOrderType?: "buy" | "sell") {
               sellerRating: 0,
               description: listing.description || "No description provided",
               minAmount: Array.isArray(listing.metadata) && listing.metadata[0]?.minAmount !== undefined 
-              ? listing.metadata[0].minAmount / (10 ** (details?.decimals || 0)) 
+              ? listing.metadata[0].minAmount  
               : undefined,
               maxAmount: listing.maxAmount !== undefined 
-              ? listing.maxAmount / (10 ** (details?.decimals || 0)) 
+              ? listing.maxAmount  
               : undefined,
               expiry: listing.expiry? new Date(Number(listing.expiry) * 1000).toISOString()
               : "Unknown",

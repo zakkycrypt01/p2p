@@ -1,4 +1,3 @@
-// Convert the listing detail page to a client component
 "use client"
 
 import { TradeDetail } from "@/components/trade/trade-detail"

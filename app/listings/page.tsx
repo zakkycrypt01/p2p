@@ -1,52 +1,119 @@
 "use client"
 
 import { useState } from "react"
+import { useListings } from "@/hooks/use-listings"
+import { ListingCard } from "@/components/listings/listing-card"
 import { ListingFilter } from "@/components/listings/listing-filter"
-import { ListingList } from "@/components/listings/listing-list"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react"
+import Link from "next/link"
 
-export default function Listings() {
-  const [orderType, setOrderType] = useState<"buy" | "sell">("buy")
+export default function ListingsPage() {
+  const [activeTab, setActiveTab] = useState<"buy" | "sell">("sell")
+  const { listings: buyListings, isLoading: isBuyLoading } = useListings("sell")
+  const { listings: sellListings, isLoading: isSellLoading } = useListings("buy")
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-        <h1 className="text-3xl font-bold">Merchant Order Book</h1>
+    <div className="container mx-auto py-8 px-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">P2P Listings</h1>
+          <p className="text-muted-foreground mt-1">
+            Buy and sell crypto directly with other users
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/listings/new">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Listing
+          </Link>
+        </Button>
       </div>
 
-      <Tabs defaultValue="sell" onValueChange={(value) => setOrderType(value as "buy" | "sell")} className="w-full mb-6">
-        <div className="border-b mb-6">
-          <TabsList className="bg-transparent -mb-px">
-            <TabsTrigger
-              value="sell"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-            >
-              Buy Crypto
-              <span className="ml-2 text-xs text-muted-foreground">(Merchant sells)</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="buy"
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
-            >
-              Sell Your Crypto
-              <span className="ml-2 text-xs text-muted-foreground">(Merchant buys)</span>
-            </TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="sell" className="mt-0">
-          <div className="mb-6">
-            <ListingFilter orderType="buy" />
-          </div>
-          <ListingList orderType="buy" />
-        </TabsContent>
+      <Tabs
+        defaultValue="sell"
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as "buy" | "sell")}
+        className="mb-8"
+      >
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="sell">Buy Tokens</TabsTrigger>
+          <TabsTrigger value="buy">Sell Your Tokens</TabsTrigger>
+        </TabsList>
 
-        <TabsContent value="buy" className="mt-0">
+
+        <TabsContent value="sell">
           <div className="mb-6">
             <ListingFilter orderType="sell" />
           </div>
-          <ListingList orderType="sell" />
+          {isSellLoading ? (
+            <div className="text-center py-12">Loading listings...</div>
+          ) : sellListings.length === 0 ? (
+            <div className="text-center py-12">
+              <h3 className="text-lg font-medium mb-2">No sell listings found</h3>
+              <p className="text-muted-foreground mb-4">
+                There are no merchants selling tokens right now.
+              </p>
+              <Button asChild>
+                <Link href="/listings/new">Create a Listing</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sellListings.map((listing) => (
+                <ListingCard
+                  key={listing.id}
+                  id={listing.id}
+                  tokenSymbol={listing.tokenSymbol || ""}
+                  tokenIcon={listing.tokenIcon || ""}
+                  amount={listing.amount ?? 0}
+                  price={listing.price}
+                  fiatCurrency={listing.fiatCurrency || ""}
+                  sellerRating={listing.sellerRating}
+                  paymentMethod={listing.paymentMethod}
+                  orderType="buy"
+                />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
+        <TabsContent value="buy">
+          <div className="mb-6">
+            <ListingFilter orderType="buy" />
+          </div>
+          {isBuyLoading ? (
+            <div className="text-center py-12">Loading listings...</div>
+          ) : buyListings.length === 0 ? (
+            <div className="text-center py-12">
+              <h3 className="text-lg font-medium mb-2">No buy listings found</h3>
+              <p className="text-muted-foreground mb-4">
+                There are no merchants looking to buy tokens right now.
+              </p>
+              <Button asChild>
+                <Link href="/listings/new">Create a Listing</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {buyListings.map((listing) => (
+                <ListingCard
+                  key={listing.id}
+                  id={listing.id}
+                  tokenSymbol={listing.tokenSymbol || ""}
+                  tokenIcon={listing.tokenIcon || ""}
+                  amount={listing.amount ?? 0}
+                  price={listing.price}
+                  fiatCurrency={listing.fiatCurrency || ""}
+                  sellerRating={listing.sellerRating}
+                  paymentMethod={listing.paymentMethod}
+                  orderType="sell"
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   )

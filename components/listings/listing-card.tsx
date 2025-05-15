@@ -60,15 +60,15 @@ export function ListingCard({
             </div>
             <div className="flex flex-col gap-1">
               <Badge variant={orderType === "buy" ? "default" : "secondary"} className="flex items-center gap-1">
-                {orderType === "buy" ? (
+                {orderType === "sell" ? (
                   <>
                     <ArrowUpRight className="h-3 w-3" />
-                    Buy
+                    Merchant Buys
                   </>
                 ) : (
                   <>
                     <ArrowDownRight className="h-3 w-3" />
-                    Sell
+                    Merchant Sells
                   </>
                 )}
               </Badge>
@@ -120,7 +120,9 @@ export function ListingCard({
       </CardContent>
       <CardFooter className="bg-muted/50 p-3">
         <Button asChild className="w-full">
-          <Link href={`/listings/${id}`}>View Listing</Link>
+          <Link href={`/listings/${id}`}>
+            {orderType === "sell" ? "Sell Your Tokens" : "Buy Tokens"}
+          </Link>
         </Button>
       </CardFooter>
     </Card>

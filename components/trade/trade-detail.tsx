@@ -19,10 +19,11 @@ interface Listing {
   id: string
   tokenSymbol: string
   tokenIcon: string
+  amount: number
   price: number
   fiatCurrency: string
   sellerAddress: string
-  address: string
+  address?: string
   sellerRating: number
   paymentMethods: string[]
   status: string
@@ -34,7 +35,7 @@ interface Listing {
   orderType?: "buy" | "sell"
   paymentWindow?: number
   releaseTime?: number
-  amount?: number
+  availableAmount?: number
   totalAmount?: number
   paymentDetails?: {
     [key: string]: {
@@ -65,40 +66,40 @@ export function TradeDetail({ listing }: TradeDetailProps) {
         ? "partially_sold"
         : status === "completed"
           ? "sold"
-          : status.replace(/\s+/g, "_").toLowerCase(); // Replace spaces with underscores
+          : status.replace(/\s+/g, "_").toLowerCase() // Replace spaces with underscores
 
   // Calculate available amount for partially sold listings
-  const amount =
-    listing.amount !== undefined
-      ? listing.amount
+  const availableAmount =
+    listing.availableAmount !== undefined
+      ? listing.availableAmount
       : normalizedStatus === "partially_sold"
-        ? (listing.amount ?? 0) * 0.4
+        ? listing.amount * 0.4
         : listing.amount
 
   const totalAmount = listing.totalAmount !== undefined ? listing.totalAmount : listing.amount
-  const soldAmount = (totalAmount ?? 0) - (amount ?? 0)
-  const soldPercentage = (soldAmount / (totalAmount ?? 1)) * 100
+  const soldAmount = totalAmount - availableAmount
+  const soldPercentage = (soldAmount / totalAmount) * 100
 
   // Handle null address scenario
-  const isOwner = address && address === listing.sellerAddress
-  const isBuyer = address && address !== listing.sellerAddress
+  const isOwner = address === (listing.sellerAddress || listing.address)
+  const isBuyer = !!address && address !== (listing.sellerAddress || listing.address)
   const isVisitor = !address
 
-  const canCreateOrder = 
+  const canCreateOrder =
     (normalizedStatus === "active" || normalizedStatus === "partially_sold") &&
     !!address &&
-    address !== listing.sellerAddress;
+    address !== (listing.sellerAddress || listing.address)
 
   console.log({
     address,
-    sellerAddress: listing.sellerAddress,
+    sellerAddress: listing.sellerAddress || listing.address,
     isOwner,
     isBuyer,
     normalizedStatus,
     canCreateOrder,
   })
 
-  const isBuyOrder = listing.orderType === "buy"
+  const isBuyOrder = listing.orderType === "sell"
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString()
@@ -156,7 +157,27 @@ export function TradeDetail({ listing }: TradeDetailProps) {
       case "canceled":
         return "Canceled"
       default:
-        return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1)
+        return normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1).replace(/_/g, " ")
+    }
+  }
+
+  // Determine the correct link based on order type
+  const getOrderLink = () => {
+    if (isBuyOrder) {
+      // For buy orders, users sell their tokens to the merchant
+      return `/listings/${listing.id}/sell-tokens`
+    } else {
+      // For sell orders, users buy tokens from the merchant
+      return `/listings/${listing.id}/create-order`
+    }
+  }
+
+  // Get the appropriate button text based on order type
+  const getOrderButtonText = () => {
+    if (isBuyOrder) {
+      return "Sell Your Tokens"
+    } else {
+      return "Buy Tokens"
     }
   }
 
@@ -210,7 +231,7 @@ export function TradeDetail({ listing }: TradeDetailProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Available Amount</span>
                   <span className="text-sm font-semibold">
-                    {amount} {listing.tokenSymbol}
+                    {availableAmount} {listing.tokenSymbol}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -222,7 +243,7 @@ export function TradeDetail({ listing }: TradeDetailProps) {
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Total Value</span>
                   <span className="text-sm font-semibold text-primary">
-                    {((amount ?? 0) * listing.price).toFixed(2)} {listing.fiatCurrency}
+                    {(availableAmount * listing.price).toFixed(2)} {listing.fiatCurrency}
                   </span>
                 </div>
               </div>
@@ -232,7 +253,7 @@ export function TradeDetail({ listing }: TradeDetailProps) {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>
-                    Available: {(amount ?? 0).toFixed(4)} {listing.tokenSymbol}
+                    Available: {availableAmount.toFixed(4)} {listing.tokenSymbol}
                   </span>
                   <span>
                     Sold: {soldAmount.toFixed(4)} {listing.tokenSymbol}
@@ -246,7 +267,7 @@ export function TradeDetail({ listing }: TradeDetailProps) {
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">Total Value</h3>
                 <p className="text-xl font-semibold">
-                  {((totalAmount ?? 0) * listing.price).toFixed(2)} {listing.fiatCurrency}
+                  {(totalAmount * listing.price).toFixed(2)} {listing.fiatCurrency}
                 </p>
               </div>
 
@@ -340,7 +361,8 @@ export function TradeDetail({ listing }: TradeDetailProps) {
               </div>
               <div>
                 <p className="font-medium">
-                  {listing.address.slice(0, 6)}...{listing.address.slice(-4)}
+                  {(listing.address || listing.sellerAddress).slice(0, 6)}...
+                  {(listing.address || listing.sellerAddress).slice(-4)}
                 </p>
                 <div className="flex items-center gap-1 text-primary">
                   <Star className="h-4 w-4 fill-current" />
@@ -360,7 +382,7 @@ export function TradeDetail({ listing }: TradeDetailProps) {
         {canCreateOrder && (
           <Card>
             <CardHeader>
-              <CardTitle>Create Order</CardTitle>
+              <CardTitle>{isBuyOrder ? "Sell Your Tokens" : "Buy Tokens"}</CardTitle>
               <CardDescription>Start trading with this merchant</CardDescription>
             </CardHeader>
             <CardContent>
@@ -369,15 +391,16 @@ export function TradeDetail({ listing }: TradeDetailProps) {
                 <div className="text-sm">
                   <p className="font-medium mb-1">Ready to trade?</p>
                   <p>
-                    When you create an order, you'll be able to proceed with the payment details and complete the
-                    transaction.
+                    {isBuyOrder
+                      ? "When you sell your tokens, they'll be locked in escrow until you receive payment from the merchant."
+                      : "When you create an order, you'll be able to proceed with the payment details and complete the transaction."}
                   </p>
                 </div>
               </div>
             </CardContent>
             <CardFooter>
               <Button className="w-full" asChild>
-                <Link href={`/listings/${listing.id}/create-order`}>Create Order</Link>
+                <Link href={getOrderLink()}>{getOrderButtonText()}</Link>
               </Button>
             </CardFooter>
           </Card>
@@ -391,38 +414,74 @@ export function TradeDetail({ listing }: TradeDetailProps) {
         )}
 
         {/* Trade information for buyers */}
-        {isBuyer && normalizedStatus === "active" && (
+        {isBuyer && (normalizedStatus === "active" || normalizedStatus === "partially_sold") && (
           <Card>
             <CardHeader>
               <CardTitle>How It Works</CardTitle>
             </CardHeader>
             <CardContent>
               <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="item-1">
-                  <AccordionTrigger>Step 1: Create an Order</AccordionTrigger>
-                  <AccordionContent>
-                    Click the "Create Order" button to specify how much you want to trade and initiate the transaction.
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="item-2">
-                  <AccordionTrigger>Step 2: Make Payment</AccordionTrigger>
-                  <AccordionContent>
-                    After creating an order, you'll see payment instructions. Send the payment using one of the accepted
-                    methods.
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="item-3">
-                  <AccordionTrigger>Step 3: Confirm Payment</AccordionTrigger>
-                  <AccordionContent>
-                    Mark your payment as sent in the order details page. The merchant will verify your payment.
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="item-4">
-                  <AccordionTrigger>Step 4: Receive Crypto</AccordionTrigger>
-                  <AccordionContent>
-                    Once the merchant confirms your payment, they'll release the crypto from escrow to your wallet.
-                  </AccordionContent>
-                </AccordionItem>
+                {isBuyOrder ? (
+                  // Steps for selling tokens to merchant (buy order)
+                  <>
+                    <AccordionItem value="item-1">
+                      <AccordionTrigger>Step 1: Sell Your Tokens</AccordionTrigger>
+                      <AccordionContent>
+                        Click the "Sell Your Tokens" button to specify how much you want to sell and initiate the
+                        transaction.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-2">
+                      <AccordionTrigger>Step 2: Lock Tokens in Escrow</AccordionTrigger>
+                      <AccordionContent>
+                        Your tokens will be locked in escrow to ensure a secure transaction. The merchant will be
+                        notified.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-3">
+                      <AccordionTrigger>Step 3: Receive Payment</AccordionTrigger>
+                      <AccordionContent>
+                        The merchant will send payment using one of your accepted payment methods. Check your account.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-4">
+                      <AccordionTrigger>Step 4: Confirm Payment Receipt</AccordionTrigger>
+                      <AccordionContent>
+                        Once you've received payment, confirm it in the order details page to release the tokens from
+                        escrow.
+                      </AccordionContent>
+                    </AccordionItem>
+                  </>
+                ) : (
+                  // Steps for buying tokens from merchant (sell order)
+                  <>
+                    <AccordionItem value="item-1">
+                      <AccordionTrigger>Step 1: Create an Order</AccordionTrigger>
+                      <AccordionContent>
+                        Click the "Buy Tokens" button to specify how much you want to buy and initiate the transaction.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-2">
+                      <AccordionTrigger>Step 2: Make Payment</AccordionTrigger>
+                      <AccordionContent>
+                        After creating an order, you'll see payment instructions. Send the payment using one of the
+                        accepted methods.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-3">
+                      <AccordionTrigger>Step 3: Confirm Payment</AccordionTrigger>
+                      <AccordionContent>
+                        Mark your payment as sent in the order details page. The merchant will verify your payment.
+                      </AccordionContent>
+                    </AccordionItem>
+                    <AccordionItem value="item-4">
+                      <AccordionTrigger>Step 4: Receive Crypto</AccordionTrigger>
+                      <AccordionContent>
+                        Once the merchant confirms your payment, they'll release the crypto from escrow to your wallet.
+                      </AccordionContent>
+                    </AccordionItem>
+                  </>
+                )}
               </Accordion>
             </CardContent>
           </Card>
