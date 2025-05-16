@@ -1384,7 +1384,7 @@ export function useContract() {
       })
       throw new Error("No connected wallet")
     }
-
+  
     // 1) fetch a coin object of the correct type with enough balance
     const coins = await suiClient.getCoins({
       owner: currentAccount.address,
@@ -1399,26 +1399,24 @@ export function useContract() {
       })
       throw new Error("Not enough tokens")
     }
-
+  
     const tx = new Transaction()
-
-    // 2) split exactly the amount you want to sell
-    const [splitCoin] = tx.splitCoins(tx.object(coinObj.coinObjectId), [tx.pure.u64(tokenAmount)])
-
-    // 3) call Move entry
+  
+    // 2) create moveCall with the coin object directly
     tx.moveCall({
       target: `${MarketplacePackageId}::${MODULE_NAME}::create_sale_order`,
       typeArguments: [coinType],
       arguments: [
         tx.object(advertId), // &mut BuyAdvert
-        splitCoin, // Coin<CoinType>
+        tx.object(coinObj.coinObjectId), // Coin<CoinType>
         tx.pure.u64(tokenAmount), // u64
         tx.object(SUI_CLOCK_OBJECT_ID),
       ],
     })
-
+  
     return tx
   }
+  
 
   // Buyer (merchant) marks sale payment made
   const markSalePaymentMade = async (saleOrderId: string): Promise<string | null> => {

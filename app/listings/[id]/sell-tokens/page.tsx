@@ -199,7 +199,7 @@ export default function SellTokensPage() {
       const coinTypeArg = listing.coinType || "0x2::sui::SUI";
       const transactionBlock = await createSaleOrder({
         advertId: listingId,
-        coinType: coinTypeArg,
+        coinType: "0x2::sui::SUI",
         tokenAmount,
       });
       const txDigest = await executeTransaction(transactionBlock, {
