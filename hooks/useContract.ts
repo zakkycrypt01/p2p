@@ -658,7 +658,7 @@ export function useContract() {
     const tx = new Transaction()
 
     // split off exactly the amount to list
-    const [splitCoin] = tx.splitCoins(tx.object(token_coin), [tx.pure.u64(token_amount)])
+    const [splitCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(token_amount)])
 
     // serialize metadata
     const encodedKeys = metadataKeys.map((k) => new TextEncoder().encode(k))
@@ -1384,7 +1384,7 @@ export function useContract() {
       })
       throw new Error("No connected wallet")
     }
-  
+
     // 1) fetch a coin object of the correct type with enough balance
     const coins = await suiClient.getCoins({
       owner: currentAccount.address,
@@ -1399,24 +1399,28 @@ export function useContract() {
       })
       throw new Error("Not enough tokens")
     }
-  
+
     const tx = new Transaction()
-  
-    // 2) create moveCall with the coin object directly
+    const GAS_BUDGET = BigInt(50000000) // 0.02 SUI in mist
+    tx.setGasBudget(GAS_BUDGET)
+
+    // 2) split exactly the amount you want to sell
+    const [splitCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(tokenAmount)])
+
+    // 3) call Move entry
     tx.moveCall({
       target: `${MarketplacePackageId}::${MODULE_NAME}::create_sale_order`,
       typeArguments: [coinType],
       arguments: [
         tx.object(advertId), // &mut BuyAdvert
-        tx.object(coinObj.coinObjectId), // Coin<CoinType>
+        splitCoin, // Coin<CoinType>
         tx.pure.u64(tokenAmount), // u64
         tx.object(SUI_CLOCK_OBJECT_ID),
       ],
     })
-  
+
     return tx
   }
-  
 
   // Buyer (merchant) marks sale payment made
   const markSalePaymentMade = async (saleOrderId: string): Promise<string | null> => {

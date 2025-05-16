@@ -70,7 +70,7 @@ export const useSubmitTransaction = () => {
       }
 
       // set a standard gas budget (must be done before signAndExecute)
-      txToExec.setGasBudget(BigInt(50_000_000));
+      txToExec.setGasBudget(50_000_000);
 
       // now actually send
       return new Promise((resolve) => {
