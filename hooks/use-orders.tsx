@@ -35,7 +35,7 @@ export interface Order {
 
 export function useOrders() {
   const { address } = useSuiWallet()
-  const { getOrderByOrderId, getSaleOrderById, markPaymentMade, getAllSaleOrders, markSalePaymentReceived } = useContract()
+  const { getOrderByOrderId, getSaleOrderById, markPaymentMade, getAllSaleOrders, markSalePaymentReceived, cancelOrder: cancelOrderOnChain } = useContract()
 
   const createOrder = useCallback(
     (
@@ -134,7 +134,7 @@ export function useOrders() {
     [markSalePaymentReceived],
   )
 
- const cancelOrder = useCallback(
+  const cancelOrder = useCallback(
     (orderId: string) => {
       console.log('orderId :>> ', orderId);
     },
@@ -159,7 +159,7 @@ export function useOrders() {
     getOrder,
     markPaymentAsSent,
     completeOrder,
-    cancelOrder,
+    cancelOrder: cancelOrderHandler,
     openDispute,
     uploadPaymentProof,
   }

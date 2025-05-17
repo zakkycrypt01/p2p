@@ -151,7 +151,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   const [isCancelling, setIsCancelling] = useState(false)
   const [isDisputing, setIsDisputing] = useState(false)
   const [expiryTimestamp, setExpiryTimestamp] = useState<number | null>(null)
-  const [formattedOrder, setFormattedOrder] = useState<any>(null)
+  const [formattedOrder, setFormattedOrder] = useState<Record<string, any> | null>(null)
 
   useEffect(() => {
     if (!address) return
@@ -314,12 +314,22 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   const handleCancelOrder = async () => {
     setIsCancelling(true)
     try {
-      await cancelOrder(order.id)
-      setFormattedOrder((p: any) => ({ ...p, status: "cancelled" }))
-      toast({ title: "Cancelled", description: "Order cancelled" })
-      setTimeout(() => router.push("/dashboard"), 1500)
-    } catch {
-      toast({ title: "Error", description: "Could not cancel", variant: "destructive" })
+      // invoke the hook that sends the on-chain cancel tx
+      const txDigest = await cancelOrder(order.id)
+      console.log('[handleCancelOrder] tx digest:', txDigest)
+
+      // update UI immediately
+      setFormattedOrder((prev) => {
+        if (!prev) return prev
+        return { ...prev, status: 'cancelled' }
+      })
+      toast({ title: 'Cancelled', description: 'Order cancelled' })
+
+      // after a moment navigate back
+      setTimeout(() => router.push('/dashboard'), 1500)
+    } catch (err) {
+      console.error('[handleCancelOrder] error:', err)
+      toast({ title: 'Error', description: 'Could not cancel order', variant: 'destructive' })
     } finally {
       setIsCancelling(false)
     }
