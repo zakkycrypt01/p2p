@@ -142,7 +142,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   const { address } = useSuiWallet()
   const router = useRouter()
   const { toast } = useToast()
-  const { getOrder, getSaleOrder, markPaymentAsSent, completeOrder, cancelOrder, uploadPaymentProof } = useOrders()
+  const { getOrder, markPaymentAsSent, completeOrder, cancelOrder, uploadPaymentProof } = useOrders()
   const [order, setOrder] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null)
@@ -250,8 +250,8 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
 
   useEffect(() => {
     if (!order?.id) return
-    const iv = setInterval(fetchOrderStatus, 30000)
-    return () => clearInterval(iv)
+    // just fetch status once and don’t start an interval
+    fetchOrderStatus()
   }, [order?.id, fetchOrderStatus])
 
   useEffect(() => {

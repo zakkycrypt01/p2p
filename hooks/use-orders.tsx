@@ -94,40 +94,21 @@ export function useOrders() {
 
   const getOrder = useCallback(
     async (params: { id: string }) => {
-      const { id: orderId } = params;
-      
+      const { id: orderId } = params
       if (!orderId) {
-        console.error("Invalid order ID");
-        return null;
-      }
-      
-      try {
-        return await getOrderByOrderId(orderId);
-      } catch (error) {
-        console.error("Error fetching order:", error);
-        return null;
-      }
-    },
-    [getOrderByOrderId],
-  )
-
-  const getSaleOrder = useCallback(
-    async (params: { id: string }) => {
-      const { id } = params
-      if (!id) {
-        console.error("Invalid sale order ID")
+        console.error("Invalid order ID")
         return null
       }
       try {
-        const sale = await getSaleOrderById(id)
-        if (!sale) console.warn(`SaleOrder ${id} not found`)
-        return sale
+        const primary = await getOrderByOrderId(orderId)
+        if (primary) return primary
+        return await getSaleOrderById(orderId)
       } catch (err) {
-        console.error("Error fetching sale order:", err)
+        console.error("Error fetching order:", err)
         return null
       }
     },
-    [getSaleOrderById],
+    [getOrderByOrderId, getSaleOrderById],
   )
 
   const markPaymentAsSent = useCallback(
@@ -139,7 +120,6 @@ export function useOrders() {
     [],
   );
 
-  // Mark order as completed (confirm sale payment received)
   const completeOrder = useCallback(
     (orderId: string) => {
       console.log('Confirming payment received for sale order:', orderId)
@@ -154,7 +134,6 @@ export function useOrders() {
     [markSalePaymentReceived],
   )
 
-  // Cancel an order
   const cancelOrder = useCallback(
     (orderId: string) => {
       console.log('orderId :>> ', orderId);
@@ -178,7 +157,6 @@ export function useOrders() {
   return {
     createOrder,
     getOrder,
-    getSaleOrder,
     markPaymentAsSent,
     completeOrder,
     cancelOrder,
