@@ -127,7 +127,7 @@ export function MyTrades({ limit, showViewAll }: MyTradesProps) {
             You don't have any trades yet
           </p>
           <Button asChild>
-            <Link href="/">Browse Listings</Link>
+            <Link href="/listings">Browse Listings</Link>
           </Button>
         </Card>
       ) : (
