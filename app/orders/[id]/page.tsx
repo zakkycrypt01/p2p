@@ -159,62 +159,60 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
     const fetchOrder = async () => {
       setIsLoading(true)
       try {
-        const fetchedOrder = await getOrder({ id })
-        const orderData = fetchedOrder ?? (await getSaleOrder({ id }))
+        const orderData = await getOrder({ id })
+        if (!orderData) throw new Error("Order not found")
 
-        if (orderData) {
-          setOrder(orderData)
+        setOrder(orderData)
 
-          const paymentDetails: Record<string, {
-            accountName?: string
-            accountNumber?: string
-            bankName?: string
-            instructions: string
-          }> = {
-            "bank transfer": {
-              accountName: "Merchant Bank Account",
-              accountNumber: "Contact merchant",
-              bankName: "Contact merchant",
-              instructions: "Please contact merchant for payment details and include your order ID",
-            },
-          }
-
-          const fmt = {
-            id: orderData.id,
-            shortId: `${orderData.id.slice(0, 6)}...${orderData.id.slice(-4)}`,
-            listingId: orderData.listingId,
-            tokenSymbol: "SUI",
-            tokenIcon: "/tokens/sui.png",
-            amount: formatTokenAmount(orderData.tokenAmount),
-            price: formatPrice(orderData.price),
-            fiatCurrency: "USD",
-            merchantAddress: orderData.seller,
-            merchantRating: 4.8,
-            buyerAddress: orderData.buyer,
-            status: getStatusFromCode(orderData),
-            createdAt: new Date(Number(orderData.createdAt) * 1e3).toISOString(),
-            expiresAt: new Date(Number(orderData.expiry) * 1e3).toISOString(),
-            paymentMethods: orderData.metadata?.paymentMethods?.split(",") || ["Bank Transfer"],
-            orderType: orderData.buyer === address ? "buy" : "sell",
-            paymentDetails,
-            paymentMade: orderData.paymentMade,
-            paymentReceived: orderData.paymentReceived,
-          }
-
-          fmt.paymentMethods.forEach((m: string) => {
-            const key = m.toLowerCase().trim()
-            if (!fmt.paymentDetails[key]) {
-              fmt.paymentDetails[key] = {
-                accountName: "Contact merchant",
-                instructions: `Please contact merchant for ${m} payment details`,
-              }
-            }
-          })
-
-          setFormattedOrder(fmt)
-          setSelectedPaymentMethod(fmt.paymentMethods[0])
-          setExpiryTimestamp(new Date(fmt.expiresAt).getTime())
+        const paymentDetails: Record<string, {
+          accountName?: string
+          accountNumber?: string
+          bankName?: string
+          instructions: string
+        }> = {
+          "bank transfer": {
+            accountName: "Merchant Bank Account",
+            accountNumber: "Contact merchant",
+            bankName: "Contact merchant",
+            instructions: "Please contact merchant for payment details and include your order ID",
+          },
         }
+
+        const fmt = {
+          id: orderData.id,
+          shortId: `${orderData.id.slice(0, 6)}...${orderData.id.slice(-4)}`,
+          listingId: orderData.listingId,
+          tokenSymbol: "SUI",
+          tokenIcon: "/tokens/sui.png",
+          amount: formatTokenAmount(orderData.tokenAmount),
+          price: formatPrice(orderData.price),
+          fiatCurrency: "USD",
+          merchantAddress: orderData.seller,
+          merchantRating: 4.8,
+          buyerAddress: orderData.buyer,
+          status: getStatusFromCode(orderData),
+          createdAt: new Date(Number(orderData.createdAt) * 1e3).toISOString(),
+          expiresAt: new Date(Number(orderData.expiry) * 1e3).toISOString(),
+          paymentMethods: orderData.metadata?.paymentMethods?.split(",") || ["Bank Transfer"],
+          orderType: orderData.buyer === address ? "buy" : "sell",
+          paymentDetails,
+          paymentMade: orderData.paymentMade,
+          paymentReceived: orderData.paymentReceived,
+        }
+
+        fmt.paymentMethods.forEach((m: string) => {
+          const key = m.toLowerCase().trim()
+          if (!fmt.paymentDetails[key]) {
+            fmt.paymentDetails[key] = {
+              accountName: "Contact merchant",
+              instructions: `Please contact merchant for ${m} payment details`,
+            }
+          }
+        })
+
+        setFormattedOrder(fmt)
+        setSelectedPaymentMethod(fmt.paymentMethods[0])
+        setExpiryTimestamp(new Date(fmt.expiresAt).getTime())
       } catch (err) {
         console.error(err)
         toast({ title: "Error", description: "Failed to load order", variant: "destructive" })
@@ -224,7 +222,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
     }
 
     fetchOrder()
-  }, [address, id, getOrder, getSaleOrder])
+  }, [address, id, getOrder])
 
   const fetchOrderStatus = useCallback(async () => {
     if (!order?.id) return
