@@ -159,7 +159,7 @@ export function useOrders() {
     getOrder,
     markPaymentAsSent,
     completeOrder,
-    cancelOrder: cancelOrderHandler,
+    cancelOrder,
     openDispute,
     uploadPaymentProof,
   }
