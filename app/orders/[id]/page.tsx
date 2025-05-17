@@ -375,6 +375,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   }
 
   const isBuyOrder = formattedOrder.orderType === "buy"
+  const isSellOrder = !isBuyOrder
   const isSeller = formattedOrder.merchantAddress === address
   const totalPaymentAmount = (
     Number.parseFloat(formattedOrder.amount) * Number.parseFloat(formattedOrder.price)
@@ -783,19 +784,16 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                   </>
                 )}
 
-                {formattedOrder.status === "payment_sent" && (
+                {formattedOrder.status === "payment_sent" && isSellOrder && (
                   <>
-                    <ChatButton orderId={order.id} className="w-full" hasNewMessages={true} />
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-sm">
-                        Your payment has been marked as sent. The merchant will verify and release the crypto to your
-                        wallet.
-                      </p>
-                    </div>
-                    <Button variant="outline" className="w-full" onClick={handleUploadPaymentProof}>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload Additional Proof
+                    <ChatButton orderId={order.id} className="w-full mb-2" hasNewMessages={true} />
+                    <Button className="w-full" onClick={handleConfirmPayment} disabled={isConfirming}>
+                      {isConfirming ? "Confirming..." : "Confirm Payment Received"}
                     </Button>
+                    <div className="flex items-start gap-2 p-2 bg-muted rounded-md mb-2">
+                      <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
+                      <p className="text-xs">Verify that you've received the payment before confirming.</p>
+                    </div>
                   </>
                 )}
 
@@ -1108,11 +1106,11 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                   </>
                 )}
 
-                {formattedOrder.status === "payment_sent" && (
+                {formattedOrder.status === "payment_sent" && isSellOrder && (
                   <>
                     <ChatButton orderId={order.id} className="w-full mb-2" hasNewMessages={true} />
                     <Button className="w-full" onClick={handleConfirmPayment} disabled={isConfirming}>
-                      {isConfirming ? "Confirm Payment Received" : "Confirm Payment Received"}
+                      {isConfirming ? "Confirming..." : "Confirm Payment Received"}
                     </Button>
                     <div className="flex items-start gap-2 p-2 bg-muted rounded-md mb-2">
                       <AlertCircle className="h-4 w-4 text-primary mt-0.5" />

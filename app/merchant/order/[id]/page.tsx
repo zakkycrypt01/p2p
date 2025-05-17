@@ -473,7 +473,7 @@ export default function OrderDetailPage() {
     formattedOrder.status !== "disputed"
 
   const totalPaymentAmount = (
-    Number.parseFloat(formattedOrder.amount) * Number.parseFloat(formattedOrder.price)
+    Number.parseFloat(formattedOrder.price)
   ).toFixed(2)
 
   return (
@@ -504,7 +504,7 @@ export default function OrderDetailPage() {
                   {formattedOrder.amount} {formattedOrder.tokenSymbol}
                 </CardTitle>
                 <CardDescription>
-                  @ {formattedOrder.price} {formattedOrder.fiatCurrency} per token
+                  @ {formattedOrder.price} {formattedOrder.fiatCurrency}
                 </CardDescription>
               </div>
               <div className="flex flex-col items-end gap-2">
@@ -602,8 +602,8 @@ export default function OrderDetailPage() {
                 </div>
               </div>
 
-              {/* Payment details section - different for buy vs sell */}
-              {formattedOrder.status !== "pending_payment" && (
+              {/* Payment details only for buy orders */}
+              {isMerchantBuying && formattedOrder.status !== "pending_payment" && (
                 <>
                   <Separator />
                   <div>
