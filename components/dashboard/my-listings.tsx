@@ -31,7 +31,7 @@ export function MyListings({ limit, showViewAll }: MyListingsProps) {
   const address = currentAccount?.address
   const [listings, setListings] = useState<Listing[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const { getListingsBySeller } = useContract()
+  const { getListingsBySeller, getSaleOrdersByBuyer } = useContract()
 
   useEffect(() => {
     if (!address) return
@@ -39,11 +39,15 @@ export function MyListings({ limit, showViewAll }: MyListingsProps) {
     const fetchListings = async () => {
       setIsLoading(true)
       try {
-        const raw = await getListingsBySeller(address)
-        const formatted: Listing[] = raw.map((l) => ({
+        const [sellerRaw, buyerRaw] = await Promise.all([
+          getListingsBySeller(address),
+          getSaleOrdersByBuyer(address),
+        ])
+
+        const mapToListing = (l: any): Listing => ({
           id: l.id,
           tokenSymbol: l.metadata.symbol ?? "SUI",
-          amount: Number(l.tokenAmount) / 1e9, 
+          amount: Number(l.tokenAmount) / 1e9,
           price: Number(l.price),
           fiatCurrency: l.metadata.fiatCurrency ?? "USD",
           status:
@@ -55,8 +59,16 @@ export function MyListings({ limit, showViewAll }: MyListingsProps) {
               ? "partially sold"
               : "cancelled",
           createdAt: new Date(l.createdAt * 1000).toISOString(),
-        }))
-        setListings(formatted)
+        })
+
+        const formattedSeller = sellerRaw.map(mapToListing)
+        const formattedBuyer = buyerRaw.map(mapToListing)
+        const allListings = [...formattedSeller, ...formattedBuyer]
+        const uniqueListings = Array.from(
+          new Map(allListings.map(l => [l.id, l])).values()
+        )
+
+        setListings(uniqueListings)
       } catch (error) {
         console.error("Failed to fetch listings:", error)
       } finally {
@@ -65,7 +77,7 @@ export function MyListings({ limit, showViewAll }: MyListingsProps) {
     }
 
     fetchListings()
-  }, [address, getListingsBySeller])
+  }, [address, getListingsBySeller, getSaleOrdersByBuyer])
 
   if (!address) {
     return (

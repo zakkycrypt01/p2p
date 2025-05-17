@@ -598,7 +598,7 @@ async function getAllSaleOrders() {
         : []
 
       return {
-        id: node.address,
+        id: json.advert_id,
         buyer: json.buyer,
         seller: json.seller,
         tokenAmount: BigInt(json.token_amount),
