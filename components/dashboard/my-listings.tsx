@@ -48,7 +48,7 @@ export function MyListings({ limit, showViewAll }: MyListingsProps) {
           id: l.id,
           tokenSymbol: l.metadata.symbol ?? "SUI",
           amount: Number(l.tokenAmount) / 1e9,
-          price: Number(l.price),
+          price: Number((Number(l.tokenAmount) / 1e9 * l.price).toFixed(3)),
           fiatCurrency: l.metadata.fiatCurrency ?? "USD",
           status:
             l.status === 0

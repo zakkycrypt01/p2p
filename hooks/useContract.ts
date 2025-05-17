@@ -12,6 +12,7 @@ import { SuiGraphQLClient } from "@mysten/sui/graphql"
 import { graphql } from "@mysten/sui/graphql/schemas/latest"
 import { useToast } from "@/components/ui/use-toast"
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client"
+import { number } from "zod"
 
 // instantiate sui.js client (testnet)
 const suiJsClient = new SuiClient({ url: getFullnodeUrl("testnet") })
@@ -288,7 +289,12 @@ async function getAllListings() {
 // Function to get listings from a specific seller
 async function getListingsBySeller(sellerAddress: string) {
   const allListings = await getAllListings()
-  return allListings.filter((listing) => listing.seller === sellerAddress)
+  return allListings
+    .filter((listing) => listing.seller === sellerAddress)
+    .map((listing) => ({
+      ...listing,
+      price: Number(listing.price) / 100,
+    }))
 }
 
 // Query to fetch all orders from the contract
@@ -602,7 +608,7 @@ async function getAllSaleOrders() {
         buyer: json.buyer,
         seller: json.seller,
         tokenAmount: BigInt(json.token_amount),
-        price: BigInt(json.price),
+        price: Number(json.price) / 10000000000, 
         feeAmount: BigInt(json.fee_amount),
         expiry: Number(json.expiry),
         createdAt: Number(json.created_at),
@@ -678,18 +684,11 @@ async function getSaleOrderById(saleOrderId: string) {
     objectStatus: node.status,
   }
 }
-
-/**
- * Get all SaleOrder objects created by a given seller address.
- */
 async function getSaleOrdersBySeller(sellerAddress: string): Promise<any[]> {
   const saleOrders = await getAllSaleOrders()
   return saleOrders.filter((order) => order.seller === sellerAddress)
 }
 
-/**
- * Get all SaleOrder objects created by a given buyer address.
- */
 async function getSaleOrdersByBuyer(buyerAddress: string): Promise<any[]> {
   const saleOrders = await getAllSaleOrders()
   return saleOrders.filter((order) => order.buyer === buyerAddress)
