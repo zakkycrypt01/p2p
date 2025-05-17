@@ -136,9 +136,12 @@ export function useOrders() {
 
   const cancelOrder = useCallback(
     (orderId: string) => {
-      console.log('orderId :>> ', orderId);
+      console.log('Cancelling order:', orderId)
+      cancelOrderOnChain(orderId)
+        .then(tx => console.log('Order cancelled, tx:', tx))
+        .catch(err => console.error('Error cancelling order:', err))
     },
-    [],
+    [cancelOrderOnChain],
   )
 
   // Open a dispute

@@ -203,34 +203,26 @@ export default function OrderDetailPage() {
   const [isDisputing, setIsDisputing] = useState(false)
   const [expiryTimestamp, setExpiryTimestamp] = useState<number | null>(null)
   const [formattedOrder, setFormattedOrder] = useState<any>(null)
-  // Add a new state for tracking the "mark payment as sent" action
   const [isMarkingPaymentSent, setIsMarkingPaymentSent] = useState(false)
 
   useEffect(() => {
     console.log("raw address from wallet:", address)
-    // only redirect after we see the above
     if (!address) {
-      // router.push("/")
       return
     }
 
     const fetchOrder = async () => {
       if (!address) {
-        // router.push("/")
         return
       }
 
       setIsLoading(true)
       try {
-        // first try our order system…
         const fetchedOrder = await getOrderByOrderId(id)
-        // …if not found, fall back to sale‐order lookup
         const orderData = fetchedOrder ?? (await getSaleOrderById(id))
 
         if (orderData) {
           setOrder(orderData)
-
-          // normalize both addresses: lowercase + strip leading "0x"
           const normalize = (addr: string) => addr.toLowerCase().replace(/^0x/, "").trim()
           const sellerNorm = normalize(orderData.seller)
           const userNorm = normalize(address)
@@ -243,11 +235,11 @@ export default function OrderDetailPage() {
             id: orderData.id,
             shortId: `${orderData.id.slice(0, 6)}...${orderData.id.slice(-4)}`,
             listingId: orderData.listingId,
-            tokenSymbol: "SUI", // Default to SUI
+            tokenSymbol: "SUI", 
             tokenIcon: "/tokens/sui.png",
             amount: formatTokenAmount(orderData.tokenAmount),
             price: formatPrice(orderData.price),
-            fiatCurrency: "USD", // Default to USD
+            fiatCurrency: "USD", 
             merchantAddress: orderData.seller,
             buyerAddress: orderData.buyer,
             status: getStatusFromCode(Number(orderData.status)),
@@ -256,8 +248,8 @@ export default function OrderDetailPage() {
             expiresAt: new Date(Number(orderData.expiry) * 1000).toISOString(),
             paymentMethods: orderData.metadata?.paymentMethods?.split(",") || ["Bank Transfer"],
             orderType: isSeller ? "sell" : "buy",
-            paymentWindow: Math.floor((Number(orderData.expiry) - Number(orderData.createdAt)) / 60), // in minutes
-            releaseTime: 15, // Default release time in minutes
+            paymentWindow: Math.floor((Number(orderData.expiry) - Number(orderData.createdAt)) / 60), 
+            releaseTime: 15,
             counterpartyAddress: isSeller ? orderData.buyer : orderData.seller,
             paymentDetails: {
               bankName: "Chase Bank",
@@ -271,8 +263,6 @@ export default function OrderDetailPage() {
           }
 
           setFormattedOrder(formatted)
-
-          // Set expiry timestamp for countdown
           const expiry = new Date(formatted.expiresAt).getTime()
           setExpiryTimestamp(expiry)
         }
@@ -290,8 +280,6 @@ export default function OrderDetailPage() {
 
     fetchOrder()
   }, [address, id, router, toast, getOrderByOrderId, getSaleOrderById])
-
-  // Add a second effect to run *after* `order` is set:
   useEffect(() => {
     if (!address || !order?.seller) return
 
@@ -309,8 +297,6 @@ export default function OrderDetailPage() {
     })
 
     const isSeller = sellerNorm === userNorm
-
-    // update only the fields that depend on isSeller
     setFormattedOrder(
       (prev: FormattedOrder | null) =>
         prev && {
@@ -336,10 +322,8 @@ export default function OrderDetailPage() {
   const handleConfirmPayment = async () => {
     setIsConfirming(true)
     try {
-      // Mark payment as received in our order system
       await markPaymentReceived(order.id)
 
-      // Update local state
       setFormattedOrder((prev: any) => ({ ...prev, status: "payment_confirmed" }))
 
       toast({
@@ -361,10 +345,7 @@ export default function OrderDetailPage() {
   const handleReleaseFunds = async () => {
     setIsReleasing(true)
     try {
-      // Release funds in our order system
       await markPaymentReceived(order.id)
-
-      // Update local state
       setFormattedOrder((prev: any) => ({ ...prev, status: "completed" }))
 
       toast({
@@ -386,19 +367,13 @@ export default function OrderDetailPage() {
   const handleCancelOrder = async () => {
     setIsCancelling(true)
     try {
-      // Cancel the order in our order system
       await cancelOrder(order.id)
-
-      // Update local state
       setFormattedOrder((prev: any) => ({ ...prev, status: "cancelled" }))
 
       toast({
         title: "Order cancelled",
         description: "You have cancelled the order",
       })
-
-      // Redirect to orders page after a short delay
-      setTimeout(() => router.push("/merchant/orders"), 1500)
     } catch (error) {
       console.error("Error cancelling order:", error)
       toast({
@@ -432,14 +407,10 @@ export default function OrderDetailPage() {
     }
   }
 
-  // Add a new function to handle marking payment as sent (after the handleOpenDispute function)
   const handleMarkPaymentSent = async () => {
     setIsMarkingPaymentSent(true)
     try {
-      // on‐chain call
       await markSalePaymentMade(order.id)
-
-      // Update local UI state
       setFormattedOrder((prev: any) => ({ ...prev, status: "payment_sent" }))
 
       toast({
@@ -458,7 +429,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  // Handle order expiry
   const handleOrderExpiry = () => {
     toast({
       title: "Order Expired",
@@ -476,7 +446,7 @@ export default function OrderDetailPage() {
       <div className="container mx-auto py-8 px-4 max-w-4xl">
         <div className="flex items-center mb-6">
           <Button variant="ghost" size="sm" asChild className="mr-4">
-            <Link href="/merchant/orders">
+            <Link href="/merchant/order">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Orders
             </Link>
@@ -497,7 +467,7 @@ export default function OrderDetailPage() {
       <div className="container mx-auto py-8 px-4 max-w-4xl">
         <div className="flex items-center mb-6">
           <Button variant="ghost" size="sm" asChild className="mr-4">
-            <Link href="/merchant/orders">
+            <Link href="/merchant/order">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Orders
             </Link>
@@ -508,7 +478,7 @@ export default function OrderDetailPage() {
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground mb-4">Order not found</p>
             <Button asChild>
-              <Link href="/merchant/orders">Back to Orders</Link>
+              <Link href="/merchant/order">Back to Orders</Link>
             </Button>
           </CardContent>
         </Card>
@@ -534,7 +504,7 @@ export default function OrderDetailPage() {
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <div className="flex items-center mb-6">
         <Button variant="ghost" size="sm" asChild className="mr-4">
-          <Link href="/merchant/orders">
+          <Link href="/merchant/order">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Orders
           </Link>
@@ -1015,8 +985,6 @@ export default function OrderDetailPage() {
                   )}
                 </>
               )}
-
-              {/* Sell order specific actions */}
               {isMerchantSelling && (
                 <>
                   {canConfirmPayment && (
@@ -1045,13 +1013,12 @@ export default function OrderDetailPage() {
                 </>
               )}
 
-              {/* Common actions for both buy and sell */}
               {canCancel && (
                 <Button
                   variant="outline"
                   className="w-full text-destructive"
                   onClick={handleCancelOrder}
-                  disabled={isCancelling}
+                  disabled={true}
                 >
                   {isCancelling ? "Processing..." : "Cancel Order"}
                 </Button>

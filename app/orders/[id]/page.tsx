@@ -314,19 +314,14 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   const handleCancelOrder = async () => {
     setIsCancelling(true)
     try {
-      // invoke the hook that sends the on-chain cancel tx
       const txDigest = await cancelOrder(order.id)
       console.log('[handleCancelOrder] tx digest:', txDigest)
 
-      // update UI immediately
       setFormattedOrder((prev) => {
         if (!prev) return prev
         return { ...prev, status: 'cancelled' }
       })
       toast({ title: 'Cancelled', description: 'Order cancelled' })
-
-      // after a moment navigate back
-      setTimeout(() => router.push('/dashboard'), 1500)
     } catch (err) {
       console.error('[handleCancelOrder] error:', err)
       toast({ title: 'Error', description: 'Could not cancel order', variant: 'destructive' })
