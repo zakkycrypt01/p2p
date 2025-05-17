@@ -19,13 +19,14 @@ import {
   CheckCircle,
   ShieldCheck,
   Star,
+  ArrowLeft,
+  MessageCircle,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Progress } from "@/components/ui/progress"
 import { useContract } from "@/hooks/useContract"
-import { ChatButton } from "@/components/chat/chat-button"
 
 // Define the FormattedOrder interface
 interface FormattedOrder {
@@ -187,7 +188,13 @@ export default function OrderDetailPage() {
   const router = useRouter()
   const { id } = useParams<{ id: string }>()
   const { toast } = useToast()
-  const { getOrderByOrderId, markPaymentReceived, cancelOrder } = useContract()
+  const {
+    getOrderByOrderId,
+    markPaymentReceived,
+    cancelOrder,
+    getSaleOrderById,
+    markSalePaymentMade,
+  } = useContract()
   const [order, setOrder] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isConfirming, setIsConfirming] = useState(false)
@@ -196,6 +203,8 @@ export default function OrderDetailPage() {
   const [isDisputing, setIsDisputing] = useState(false)
   const [expiryTimestamp, setExpiryTimestamp] = useState<number | null>(null)
   const [formattedOrder, setFormattedOrder] = useState<any>(null)
+  // Add a new state for tracking the "mark payment as sent" action
+  const [isMarkingPaymentSent, setIsMarkingPaymentSent] = useState(false)
 
   useEffect(() => {
     console.log("raw address from wallet:", address)
@@ -213,16 +222,17 @@ export default function OrderDetailPage() {
 
       setIsLoading(true)
       try {
-        // Get the order from our order system
+        // first try our order system…
         const fetchedOrder = await getOrderByOrderId(id)
+        // …if not found, fall back to sale‐order lookup
+        const orderData = fetchedOrder ?? (await getSaleOrderById(id))
 
-        if (fetchedOrder) {
-          setOrder(fetchedOrder)
+        if (orderData) {
+          setOrder(orderData)
 
-          // normalize both addresses: lowercase + strip leading “0x”
-          const normalize = (addr: string) =>
-            addr.toLowerCase().replace(/^0x/, "").trim()
-          const sellerNorm = normalize(fetchedOrder.seller)
+          // normalize both addresses: lowercase + strip leading "0x"
+          const normalize = (addr: string) => addr.toLowerCase().replace(/^0x/, "").trim()
+          const sellerNorm = normalize(orderData.seller)
           const userNorm = normalize(address)
 
           console.log("seller:", sellerNorm, "you:", userNorm)
@@ -230,34 +240,34 @@ export default function OrderDetailPage() {
           const isSeller = sellerNorm === userNorm
 
           const formatted = {
-            id: fetchedOrder.id,
-            shortId: `${fetchedOrder.id.slice(0, 6)}...${fetchedOrder.id.slice(-4)}`,
-            listingId: fetchedOrder.listingId,
+            id: orderData.id,
+            shortId: `${orderData.id.slice(0, 6)}...${orderData.id.slice(-4)}`,
+            listingId: orderData.listingId,
             tokenSymbol: "SUI", // Default to SUI
             tokenIcon: "/tokens/sui.png",
-            amount: formatTokenAmount(fetchedOrder.tokenAmount),
-            price: formatPrice(fetchedOrder.price),
+            amount: formatTokenAmount(orderData.tokenAmount),
+            price: formatPrice(orderData.price),
             fiatCurrency: "USD", // Default to USD
-            merchantAddress: fetchedOrder.seller,
-            buyerAddress: fetchedOrder.buyer,
-            status: getStatusFromCode(Number(fetchedOrder.status)),
-            createdAt: new Date(Number(fetchedOrder.createdAt) * 1000).toISOString(),
-            updatedAt: new Date(Number(fetchedOrder.createdAt) * 1000).toISOString(),
-            expiresAt: new Date(Number(fetchedOrder.expiry) * 1000).toISOString(),
-            paymentMethods: fetchedOrder.metadata?.paymentMethods?.split(",") || ["Bank Transfer"],
+            merchantAddress: orderData.seller,
+            buyerAddress: orderData.buyer,
+            status: getStatusFromCode(Number(orderData.status)),
+            createdAt: new Date(Number(orderData.createdAt) * 1000).toISOString(),
+            updatedAt: new Date(Number(orderData.createdAt) * 1000).toISOString(),
+            expiresAt: new Date(Number(orderData.expiry) * 1000).toISOString(),
+            paymentMethods: orderData.metadata?.paymentMethods?.split(",") || ["Bank Transfer"],
             orderType: isSeller ? "sell" : "buy",
-            paymentWindow: Math.floor((Number(fetchedOrder.expiry) - Number(fetchedOrder.createdAt)) / 60), // in minutes
+            paymentWindow: Math.floor((Number(orderData.expiry) - Number(orderData.createdAt)) / 60), // in minutes
             releaseTime: 15, // Default release time in minutes
-            counterpartyAddress: isSeller ? fetchedOrder.buyer : fetchedOrder.seller,
+            counterpartyAddress: isSeller ? orderData.buyer : orderData.seller,
             paymentDetails: {
               bankName: "Chase Bank",
               accountName: "John Smith",
               accountNumber: "1234567890",
               instructions: "Please include the order ID in the payment reference",
             },
-            paymentProofUrl: fetchedOrder.paymentProof || undefined,
-            paymentMade: fetchedOrder.paymentMade,
-            paymentReceived: fetchedOrder.paymentReceived,
+            paymentProofUrl: orderData.paymentProof || undefined,
+            paymentMade: orderData.paymentMade,
+            paymentReceived: orderData.paymentReceived,
           }
 
           setFormattedOrder(formatted)
@@ -279,35 +289,37 @@ export default function OrderDetailPage() {
     }
 
     fetchOrder()
-  }, [address, id, router, toast, getOrderByOrderId])
+  }, [address, id, router, toast, getOrderByOrderId, getSaleOrderById])
 
   // Add a second effect to run *after* `order` is set:
   useEffect(() => {
-    if (!address || !order?.seller) return;
+    if (!address || !order?.seller) return
 
-    const normalize = (addr: string) =>
-      addr.toLowerCase().replace(/^0x/, "").trim();
+    const normalize = (addr: string) => addr.toLowerCase().replace(/^0x/, "").trim()
 
-    const sellerNorm = normalize(order.seller);
-    const userNorm   = normalize(address);
+    const sellerNorm = normalize(order.seller)
+    const userNorm = normalize(address)
 
     console.log("Normalized addresses:", {
-      seller:       order.seller,
+      seller: order.seller,
       sellerNorm,
-      user:         address,
+      user: address,
       userNorm,
-      isMatch:      sellerNorm === userNorm
-    });
+      isMatch: sellerNorm === userNorm,
+    })
 
-    const isSeller = sellerNorm === userNorm;
+    const isSeller = sellerNorm === userNorm
 
     // update only the fields that depend on isSeller
-    setFormattedOrder((prev: FormattedOrder | null) => prev && {
-      ...prev,
-      orderType:           isSeller ? "sell" : "buy",
-      counterpartyAddress: isSeller ? order.buyer : order.seller,
-    });
-  }, [address, order]);
+    setFormattedOrder(
+      (prev: FormattedOrder | null) =>
+        prev && {
+          ...prev,
+          orderType: isSeller ? "sell" : "buy",
+          counterpartyAddress: isSeller ? order.buyer : order.seller,
+        },
+    )
+  }, [address, order])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString()
@@ -344,11 +356,6 @@ export default function OrderDetailPage() {
     } finally {
       setIsConfirming(false)
     }
-    toast({
-      title: "Error",
-      description: "Confirm payment functionality is not implemented.",
-      variant: "destructive",
-    })
   }
 
   const handleReleaseFunds = async () => {
@@ -391,7 +398,7 @@ export default function OrderDetailPage() {
       })
 
       // Redirect to orders page after a short delay
-      setTimeout(() => router.push("/merchant/order"), 1500)
+      setTimeout(() => router.push("/merchant/orders"), 1500)
     } catch (error) {
       console.error("Error cancelling order:", error)
       toast({
@@ -425,6 +432,32 @@ export default function OrderDetailPage() {
     }
   }
 
+  // Add a new function to handle marking payment as sent (after the handleOpenDispute function)
+  const handleMarkPaymentSent = async () => {
+    setIsMarkingPaymentSent(true)
+    try {
+      // on‐chain call
+      await markSalePaymentMade(order.id)
+
+      // Update local UI state
+      setFormattedOrder((prev: any) => ({ ...prev, status: "payment_sent" }))
+
+      toast({
+        title: "Payment marked as sent",
+        description: "You have marked your payment as sent. The seller will verify and release the crypto.",
+      })
+    } catch (error) {
+      console.error("Error marking payment as sent:", error)
+      toast({
+        title: "Error",
+        description: "Failed to mark payment as sent",
+        variant: "destructive",
+      })
+    } finally {
+      setIsMarkingPaymentSent(false)
+    }
+  }
+
   // Handle order expiry
   const handleOrderExpiry = () => {
     toast({
@@ -441,7 +474,13 @@ export default function OrderDetailPage() {
   if (isLoading || !formattedOrder) {
     return (
       <div className="container mx-auto py-8 px-4 max-w-4xl">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" size="sm" asChild className="mr-4">
+            <Link href="/merchant/orders">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Orders
+            </Link>
+          </Button>
           <h1 className="text-3xl font-bold">Order Details</h1>
         </div>
         <Card>
@@ -456,14 +495,20 @@ export default function OrderDetailPage() {
   if (!order) {
     return (
       <div className="container mx-auto py-8 px-4 max-w-4xl">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" size="sm" asChild className="mr-4">
+            <Link href="/merchant/orders">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Orders
+            </Link>
+          </Button>
           <h1 className="text-3xl font-bold">Order Details</h1>
         </div>
         <Card>
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground mb-4">Order not found</p>
             <Button asChild>
-              <Link href="/merchant/order">Back to Orders</Link>
+              <Link href="/merchant/orders">Back to Orders</Link>
             </Button>
           </CardContent>
         </Card>
@@ -487,11 +532,14 @@ export default function OrderDetailPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Order Details</h1>
-        <Button asChild variant="outline">
-          <Link href="/merchant/order">Back to Orders</Link>
+      <div className="flex items-center mb-6">
+        <Button variant="ghost" size="sm" asChild className="mr-4">
+          <Link href="/merchant/orders">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Orders
+          </Link>
         </Button>
+        <h1 className="text-3xl font-bold">Order Details</h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -608,12 +656,14 @@ export default function OrderDetailPage() {
                 </div>
               </div>
 
-              {/* Payment details section */}
+              {/* Payment details section - different for buy vs sell */}
               {formattedOrder.status !== "pending_payment" && (
                 <>
                   <Separator />
                   <div>
-                    <h3 className="text-sm font-medium mb-4">Payment Details</h3>
+                    <h3 className="text-sm font-medium mb-4">
+                      {isMerchantBuying ? "Your Payment Details" : "Payment Details"}
+                    </h3>
 
                     <Card>
                       <CardContent className="pt-6">
@@ -686,20 +736,21 @@ export default function OrderDetailPage() {
                 </>
               )}
 
-              {/* Status-specific information */}
+              {/* Status-specific information - different for buy vs sell */}
               {formattedOrder.status === "pending_payment" && (
                 <>
                   <Separator />
                   <div className="bg-muted/50 p-4 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <AlertCircle className="h-5 w-5 text-primary" />
-                      <h3 className="font-medium">Awaiting Payment</h3>
+                      <h3 className="font-medium">
+                        {isMerchantBuying ? "Waiting for Your Payment" : "Awaiting Buyer Payment"}
+                      </h3>
                     </div>
                     <p className="text-sm">
                       {isMerchantBuying ? (
                         <>
-                          You need to wait for the buyer to send payment of {totalPaymentAmount}{" "}
-                          {formattedOrder.fiatCurrency}.
+                          You need to send payment of {totalPaymentAmount} {formattedOrder.fiatCurrency} to the seller.
                         </>
                       ) : (
                         <>
@@ -717,16 +768,18 @@ export default function OrderDetailPage() {
                   <div className="bg-secondary/20 p-4 rounded-lg border border-secondary/30">
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle className="h-5 w-5 text-secondary" />
-                      <h3 className="font-medium">Payment Sent</h3>
+                      <h3 className="font-medium">
+                        {isMerchantBuying ? "Your Payment Sent" : "Payment Received from Buyer"}
+                      </h3>
                     </div>
                     <p className="text-sm mb-2">
                       {isMerchantBuying ? (
                         <>
-                          The seller has marked their payment of{" "}
+                          You've marked your payment of{" "}
                           <span className="font-medium">
                             {totalPaymentAmount} {formattedOrder.fiatCurrency}
                           </span>{" "}
-                          as sent. Please verify the payment and confirm receipt.
+                          as sent. The seller will verify and release the crypto.
                         </>
                       ) : (
                         <>
@@ -748,16 +801,16 @@ export default function OrderDetailPage() {
                   <div className="bg-secondary/20 p-4 rounded-lg border border-secondary/30">
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle className="h-5 w-5 text-secondary" />
-                      <h3 className="font-medium">Payment Confirmed</h3>
+                      <h3 className="font-medium">{isMerchantBuying ? "Payment Confirmed" : "Payment Confirmed"}</h3>
                     </div>
                     <p className="text-sm mb-2">
                       {isMerchantBuying ? (
                         <>
-                          You've confirmed receipt of the seller's payment of{" "}
+                          Your payment of{" "}
                           <span className="font-medium">
                             {totalPaymentAmount} {formattedOrder.fiatCurrency}
-                          </span>
-                          .
+                          </span>{" "}
+                          has been confirmed. The crypto will be released to your wallet.
                         </>
                       ) : (
                         <>
@@ -765,7 +818,7 @@ export default function OrderDetailPage() {
                           <span className="font-medium">
                             {totalPaymentAmount} {formattedOrder.fiatCurrency}
                           </span>
-                          . Please release the crypto to complete the trade.
+                          . The crypto will be released to the buyer.
                         </>
                       )}
                     </p>
@@ -781,7 +834,9 @@ export default function OrderDetailPage() {
                   <>
                     <Separator />
                     <div>
-                      <h3 className="text-sm font-medium mb-4">Payment Proof</h3>
+                      <h3 className="text-sm font-medium mb-4">
+                        {isMerchantBuying ? "Your Payment Proof" : "Buyer's Payment Proof"}
+                      </h3>
                       <div className="border rounded-md p-2">
                         <Image
                           src={formattedOrder.paymentProofUrl || "/placeholder.svg"}
@@ -805,9 +860,17 @@ export default function OrderDetailPage() {
                       <h3 className="font-medium">Order Completed</h3>
                     </div>
                     <p className="text-sm">
-                      This order has been completed successfully. The {formattedOrder.tokenSymbol} has been transferred
-                      to
-                      {isMerchantBuying ? " your wallet." : " the buyer's wallet."}
+                      {isMerchantBuying ? (
+                        <>
+                          This order has been completed successfully. The {formattedOrder.tokenSymbol} has been
+                          transferred to your wallet and your payment has been confirmed.
+                        </>
+                      ) : (
+                        <>
+                          This order has been completed successfully. The {formattedOrder.tokenSymbol} has been
+                          transferred to the buyer's wallet and you have received the payment.
+                        </>
+                      )}
                     </p>
                   </div>
                 </>
@@ -855,8 +918,7 @@ export default function OrderDetailPage() {
                 </div>
                 <p className="text-sm">
                   This trade is protected by our escrow service. The crypto is locked in escrow until the payment is
-                  confirmed, ensuring a The crypto is locked in escrow until the payment is confirmed, ensuring a safe
-                  trading experience for both parties.
+                  confirmed, ensuring a safe trading experience for both parties.
                 </p>
               </div>
             </div>
@@ -909,34 +971,81 @@ export default function OrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Action buttons */}
+          {/* Action buttons - different for buy vs sell */}
           <Card>
             <CardHeader>
               <CardTitle>Order Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ChatButton
-                orderId={id}
-                hasNewMessages={formattedOrder?.status === 'payment_sent'}
-              />
-              {canConfirmPayment && (
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2 p-2 bg-muted rounded-md mb-2">
-                    <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
-                    <p className="text-xs">Verify that you've received the payment before confirming.</p>
-                  </div>
-                  <Button className="w-full" onClick={handleConfirmPayment} disabled={isConfirming}>
-                    {isConfirming ? "Processing..." : "Confirm Payment Received"}
-                  </Button>
-                </div>
+              {/* Chat button */}
+              <Button variant="outline" className="w-full" asChild>
+                <Link href={`/chat/${formattedOrder.id}`} className="flex items-center justify-center">
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Chat with {isMerchantBuying ? "Seller" : "Buyer"}
+                  {formattedOrder?.status === "payment_sent" && (
+                    <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-destructive transform translate-x-1 -translate-y-1" />
+                  )}
+                </Link>
+              </Button>
+
+              {/* Buy order specific actions */}
+              {isMerchantBuying && (
+                <>
+                  {formattedOrder.status === "pending_payment" && (
+                    <>
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm">
+                          You need to send payment of {totalPaymentAmount} {formattedOrder.fiatCurrency} to the seller.
+                          Once you've sent the payment, mark it as sent.
+                        </p>
+                      </div>
+                      <Button className="w-full" onClick={handleMarkPaymentSent} disabled={isMarkingPaymentSent}>
+                        {isMarkingPaymentSent ? "Processing..." : "I've Sent the Payment"}
+                      </Button>
+                    </>
+                  )}
+
+                  {formattedOrder.status === "payment_sent" && (
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm">
+                        Your payment has been marked as sent. The seller will verify and release the crypto to your
+                        wallet.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
-              {canReleaseFunds && (
-                <Button className="w-full" disabled>
-                  Trade Completed
-                </Button>
+              {/* Sell order specific actions */}
+              {isMerchantSelling && (
+                <>
+                  {canConfirmPayment && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2 p-2 bg-muted rounded-md mb-2">
+                        <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
+                        <p className="text-xs">Verify that you've received the payment before confirming.</p>
+                      </div>
+                      <Button className="w-full" onClick={handleConfirmPayment} disabled={isConfirming}>
+                        {isConfirming ? "Processing..." : "Confirm Payment Received"}
+                      </Button>
+                    </div>
+                  )}
+
+                  {canReleaseFunds && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2 p-2 bg-muted rounded-md mb-2">
+                        <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
+                        <p className="text-xs">Once you release the funds, this action cannot be undone.</p>
+                      </div>
+                      <Button className="w-full" onClick={handleReleaseFunds} disabled={isReleasing}>
+                        {isReleasing ? "Processing..." : "Release Funds to Buyer"}
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
 
+              {/* Common actions for both buy and sell */}
               {canCancel && (
                 <Button
                   variant="outline"
@@ -948,32 +1057,30 @@ export default function OrderDetailPage() {
                 </Button>
               )}
 
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleOpenDispute}
-                disabled={
-                  isDisputing ||
-                  formattedOrder.status === "disputed" ||
-                  formattedOrder.status === "payment_confirmed"
-                }
-              >
-                {isDisputing
-                  ? "Processing..."
-                  : formattedOrder.status === "disputed"
-                    ? "Dispute Opened"
-                    : "Open Dispute"}
-              </Button>
+              {canDispute && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleOpenDispute}
+                  disabled={isDisputing || formattedOrder.status === "disputed"}
+                >
+                  {isDisputing
+                    ? "Processing..."
+                    : formattedOrder.status === "disputed"
+                      ? "Dispute Opened"
+                      : "Open Dispute"}
+                </Button>
+              )}
 
               {formattedOrder.status === "completed" && (
                 <Button asChild className="w-full">
-                  <Link href="/merchant/order">Back to Orders</Link>
+                  <Link href="/merchant/orders">Back to Orders</Link>
                 </Button>
               )}
 
               {(formattedOrder.status === "cancelled" || formattedOrder.status === "disputed") && (
                 <Button asChild className="w-full">
-                  <Link href="/merchant/order">Back to Orders</Link>
+                  <Link href="/merchant/orders">Back to Orders</Link>
                 </Button>
               )}
             </CardContent>
@@ -1070,7 +1177,7 @@ export default function OrderDetailPage() {
           {/* View on explorer */}
           <Button variant="outline" className="w-full" asChild>
             <a
-              href={`https://testnet.suivision.xyz/object/${formattedOrder.id}`}
+              href={`https://explorer.sui.io/txblock/${formattedOrder.id}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center"

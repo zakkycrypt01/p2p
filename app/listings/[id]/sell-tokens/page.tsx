@@ -19,6 +19,7 @@ import { getListingsById } from "@/actions/getListingsbyId"
 import { useContract } from "@/hooks/useContract"
 import { exec } from "child_process"
 import { useSubmitTransaction } from "@/hooks/useSubmitTransaction"
+import { useSuiClient } from "@mysten/dapp-kit"
 
 
 export default function SellTokensPage() {
@@ -29,6 +30,8 @@ export default function SellTokensPage() {
   const { createSaleOrder } = useContract()
   const { createOrder } = useOrders()
   const { executeTransaction } = useSubmitTransaction()
+    const suiClient = useSuiClient()
+  
 
   const [listing, setListing] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -199,7 +202,7 @@ export default function SellTokensPage() {
       const coinTypeArg = listing.coinType || "0x2::sui::SUI";
       const transactionBlock = await createSaleOrder({
         advertId: listingId,
-        coinType: "0x2::sui::SUI",
+        coinType: coinTypeArg,
         tokenAmount,
       });
       const txDigest = await executeTransaction(transactionBlock, {
@@ -216,16 +219,47 @@ export default function SellTokensPage() {
         onError: () => {
           console.error("Transaction rejected – params:", {
             listingId,
-            tokenCoin: coinTypeArg,
+            coinTypeArg,
             tokenAmount,
             transactionBlock,
           });
         },
       });
-      if (!txDigest) throw new Error("On-chain transaction failed or was rejected");
+      if (txDigest){
+        console.log('transaction digest', txDigest);
+        try {
+          const txData = await suiClient.getTransactionBlock({
+            digest: txDigest,
+            options: {  showEvents: true }
+          });
 
-      toast({ title: "Order created", description: `Tx submitted: ${txDigest}` });
-      router.push(`/orders/${listingId}`);
+          if (txData.events){
+            const SaleOrderCreatedEvent = txData.events.find(
+              event => event.type.includes ("::marketplace::SaleOrderCreatedEvent")
+            );
+            if (SaleOrderCreatedEvent && SaleOrderCreatedEvent.parsedJson) {
+              const orderId = (SaleOrderCreatedEvent.parsedJson as {order_id: string}).order_id;
+              console.log("Order ID:", orderId);
+              router.push(`/orders/${orderId}`);
+              return txDigest;
+            }
+          }
+
+          toast({
+            title: "Order created",
+            description: `Tx submitted: ${txDigest.slice(0, 8)}…`
+          });
+          return txDigest;
+
+        } catch (err) {
+          console.error("Error reading events from tx:", err);
+          toast({
+            title: "Failed to fetch Tx events",
+            description: err instanceof Error ? err.message : "Unknown error",
+            variant: "destructive"
+          });
+        }
+      }
     } catch (err: any) {
       console.error("Error creating sell order:", err);
       toast({

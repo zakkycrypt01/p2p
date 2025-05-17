@@ -149,6 +149,55 @@ const fetchBuyAdvertsQuery = graphql(`
   }
 `)
 
+// Query to fetch all sale orders
+const fetchSaleOrdersQuery = graphql(`
+  query FetchSaleOrders {
+    objects(
+      filter: { type: "${PACKAGE_ADDRESS}::marketplace::SaleOrder" }
+      last: 10
+    ) {
+      nodes {
+        address
+        version
+        owner {
+          __typename
+          ... on AddressOwner { owner { address } }
+          ... on Shared { initialSharedVersion }
+        }
+        asMoveObject { contents { json } }
+        previousTransactionBlock { digest }
+        status
+      }
+      pageInfo { hasNextPage startCursor }
+    }
+  }
+`)
+
+// Query to fetch sale order by ID
+const fetchSaleOrderByIdQuery = graphql(`
+  query FetchSaleOrderById($id: String!) {
+    objects(
+      filter: {
+        type: "${PACKAGE_ADDRESS}::marketplace::SaleOrder",
+        objectIds: [$id]
+      },
+      first: 1
+    ) {
+      nodes {
+        address
+        owner {
+          __typename
+          ... on AddressOwner { owner { address } }
+          ... on Shared { initialSharedVersion }
+        }
+        asMoveObject { contents { json } }
+        previousTransactionBlock { digest }
+        status
+      }
+    }
+  }
+`)
+
 async function getAllListings() {
   const result = await gqlClient.query({
     query: fetchListingsQuery,
@@ -492,6 +541,158 @@ async function getAllBuyAdverts() {
       }
     })
     .filter((x) => x != null)
+}
+
+async function getAllSaleOrders() {
+  const result = await gqlClient.query({ query: fetchSaleOrdersQuery })
+
+  type FetchSaleOrdersResult = {
+    data: {
+      objects: {
+        nodes: Array<{
+          address: string
+          owner: { __typename: string; owner?: { address: string }; initialSharedVersion?: number }
+          asMoveObject: { contents: { json: {
+            buyer: string
+            seller: string
+            token_amount: string
+            price: string
+            fee_amount: string
+            expiry: string
+            created_at: string
+            status: number
+            payment_made: boolean
+            payment_received: boolean
+            metadata?: Array<{ key: number[]; value: number[] }>
+            advert_id: string
+            escrowed_coin: { value: string }
+          } } }
+          previousTransactionBlock: { digest: string }
+          status: string
+        }>
+      }
+    }
+  }
+
+  const saleOrders = (result as unknown as FetchSaleOrdersResult)
+    .data.objects.nodes
+    .map((node) => {
+      const json = node.asMoveObject.contents.json
+      if (!json) return null
+
+      // parse metadata
+      const parsedMetadata: Record<string,string> = {}
+      if (Array.isArray(json.metadata)) {
+        json.metadata.forEach(
+          ({ key, value }: { key: number[]; value: number[] }) => {
+            const k = new TextDecoder().decode(new Uint8Array(key))
+            const v = new TextDecoder().decode(new Uint8Array(value))
+            parsedMetadata[k] = v
+          },
+        )
+      }
+
+      // extract paymentMethods if present
+      const paymentMethods = parsedMetadata['paymentMethods']
+        ? parsedMetadata['paymentMethods'].split(',')
+        : []
+
+      return {
+        id: node.address,
+        buyer: json.buyer,
+        seller: json.seller,
+        tokenAmount: BigInt(json.token_amount),
+        price: BigInt(json.price),
+        feeAmount: BigInt(json.fee_amount),
+        expiry: Number(json.expiry),
+        createdAt: Number(json.created_at),
+        status: json.status,
+        paymentMade: json.payment_made,
+        paymentReceived: json.payment_received,
+        advertId: json.advert_id,
+        escrowedAmount: BigInt(json.escrowed_coin.value),
+        metadata: parsedMetadata,
+        paymentMethods,
+        ownerType: node.owner.__typename,
+        ownerAddress: node.owner.__typename === "AddressOwner" ? node.owner.owner?.address : null,
+        initialSharedVersion: node.owner.__typename === "Shared" ? node.owner.initialSharedVersion : null,
+        transactionDigest: node.previousTransactionBlock.digest,
+        objectStatus: node.status,
+      }
+    })
+    .filter((o) => o !== null)
+
+  return saleOrders
+}
+
+async function getSaleOrderById(saleOrderId: string) {
+  const res = await gqlClient.query({
+    query: fetchSaleOrderByIdQuery,
+    variables: { id: saleOrderId },
+  })
+
+  const node = (res as any).data.objects.nodes[0]
+  if (!node?.asMoveObject?.contents?.json) return null
+  const json = node.asMoveObject.contents.json
+
+  // parse metadata
+  const md: Record<string,string> = {}
+  if (Array.isArray(json.metadata)) {
+    json.metadata.forEach(
+      ({ key, value }: { key: number[]; value: number[] }) => {
+        const k = new TextDecoder().decode(new Uint8Array(key))
+        const v = new TextDecoder().decode(new Uint8Array(value))
+        md[k] = v
+      },
+    )
+  }
+
+  const paymentMethods = md["paymentMethods"]?.split(",").map((m) => m.trim()) || []
+
+  return {
+    id: node.address,
+    buyer: json.buyer,
+    seller: json.seller,
+    tokenAmount: BigInt(json.token_amount),
+    price: BigInt(json.price),
+    feeAmount: BigInt(json.fee_amount),
+    expiry: Number(json.expiry),
+    createdAt: Number(json.created_at),
+    status: json.status,
+    paymentMade: json.payment_made,
+    paymentReceived: json.payment_received,
+    advertId: json.advert_id,
+    escrowedAmount: BigInt(json.escrowed_coin.value),
+    metadata: md,
+    paymentMethods,
+    ownerType: node.owner.__typename,
+    ownerAddress:
+      node.owner.__typename === "AddressOwner"
+        ? node.owner.owner?.address
+        : null,
+    initialSharedVersion:
+      node.owner.__typename === "Shared"
+        ? node.owner.initialSharedVersion
+        : null,
+    transactionDigest: node.previousTransactionBlock?.digest,
+    objectStatus: node.status,
+  }
+}
+
+/**
+ * Get all SaleOrder objects created by a given seller address.
+ */
+async function getSaleOrdersBySeller(sellerAddress: string): Promise<any[]> {
+  const saleOrders = await getAllSaleOrders()
+  return saleOrders.filter((order) => order.seller === sellerAddress)
+}
+
+/**
+ * Get all SaleOrder objects created by a given buyer address.
+ */
+async function getSaleOrdersByBuyer(buyerAddress: string): Promise<any[]> {
+  const saleOrders = await getAllSaleOrders()
+  return saleOrders.filter((order) => order.buyer === buyerAddress)
 }
 
 export function useContract() {
@@ -1432,6 +1633,7 @@ export function useContract() {
     const tx = new Transaction()
     tx.moveCall({
       target: `${MarketplacePackageId}::${MODULE_NAME}::mark_sale_payment_made`,
+      typeArguments: ["0x2::sui::SUI"],
       arguments: [tx.object(saleOrderId)],
     })
     return handleTransaction(tx)
@@ -1448,7 +1650,11 @@ export function useContract() {
     tx.moveCall({
       target: `${MarketplacePackageId}::${MODULE_NAME}::mark_sale_payment_received`,
       typeArguments: ["0x2::sui::SUI"],
-      arguments: [tx.object(EscrowConfigObjectId), tx.object(saleOrderId), tx.object(SUI_CLOCK_OBJECT_ID)],
+      arguments: [
+        tx.object(EscrowConfigObjectId),
+        tx.object(saleOrderId),
+        tx.object(SUI_CLOCK_OBJECT_ID),
+      ],
     })
     return handleTransaction(tx)
   }
@@ -1539,51 +1745,6 @@ export function useContract() {
     }
   }
 
-  // View: get sale-order by ID
-  const getSaleOrderById = async (orderId: string): Promise<any | null> => {
-    const tx = new Transaction()
-    tx.moveCall({
-      target: `${MarketplacePackageId}::${MODULE_NAME}::get_sale_order_by_id`,
-      typeArguments: ["0x2::sui::Sui"],
-      arguments: [tx.object(orderId)],
-    })
-    const result = await suiClient.devInspectTransactionBlock({
-      transactionBlock: tx,
-      sender: currentAccount?.address || "0x0",
-    })
-    const rv = result.results?.[0]?.returnValues?.[0]?.[0]
-    if (!rv) return null
-    const [seller, buyer, token_amount, price, fee_amount, expiry, status, created_at, pm, pr, id] =
-      bcs
-        .tuple([
-          bcs.string(), // seller
-          bcs.string(), // buyer
-          bcs.u64(),
-          bcs.u64(),
-          bcs.u64(),
-          bcs.u64(),
-          bcs.u8(),
-          bcs.u64(),
-          bcs.bool(),
-          bcs.bool(),
-          bcs.string(),
-        ])
-        .parse(new Uint8Array(rv))
-    return {
-      seller,
-      buyer,
-      tokenAmount: BigInt(token_amount.toString()),
-      price: BigInt(price.toString()),
-      feeAmount: BigInt(fee_amount.toString()),
-      expiry: Number(expiry),
-      status: Number(status),
-      createdAt: Number(created_at),
-      paymentMade: pm,
-      paymentReceived: pr,
-      id,
-    }
-  }
-
   return {
     // Existing mutation functions
     createListing,
@@ -1632,6 +1793,9 @@ export function useContract() {
     getOrdersBySeller,
     getOrderByOrderId,
     getAllBuyAdverts,
+    getAllSaleOrders,
+    getSaleOrdersBySeller,
+    getSaleOrdersByBuyer,
 
     // drip state
     isDrippingGas,

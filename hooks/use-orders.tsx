@@ -35,7 +35,7 @@ export interface Order {
 
 export function useOrders() {
   const { address } = useSuiWallet()
-  const { getOrderByOrderId, markPaymentMade } = useContract()
+  const { getOrderByOrderId, getSaleOrderById, markPaymentMade, getAllSaleOrders, markSalePaymentReceived } = useContract()
 
   const createOrder = useCallback(
     (
@@ -111,6 +111,25 @@ export function useOrders() {
     [getOrderByOrderId],
   )
 
+  const getSaleOrder = useCallback(
+    async (params: { id: string }) => {
+      const { id } = params
+      if (!id) {
+        console.error("Invalid sale order ID")
+        return null
+      }
+      try {
+        const sale = await getSaleOrderById(id)
+        if (!sale) console.warn(`SaleOrder ${id} not found`)
+        return sale
+      } catch (err) {
+        console.error("Error fetching sale order:", err)
+        return null
+      }
+    },
+    [getSaleOrderById],
+  )
+
   const markPaymentAsSent = useCallback(
     (orderId: string, paymentMethod: string) => {
       console.log('orderId :>> ', orderId, 'paymentMethod :>> ', paymentMethod);
@@ -120,12 +139,19 @@ export function useOrders() {
     [],
   );
 
-  // Mark order as completed (merchant releases funds)
+  // Mark order as completed (confirm sale payment received)
   const completeOrder = useCallback(
     (orderId: string) => {
-      console.log('orderId :>> ', orderId);
+      console.log('Confirming payment received for sale order:', orderId)
+      markSalePaymentReceived(orderId)
+        .then(txDigest => {
+          console.log('Payment received confirmed, tx:', txDigest)
+        })
+        .catch(err => {
+          console.error('Error confirming payment received:', err)
+        })
     },
-    [],
+    [markSalePaymentReceived],
   )
 
   // Cancel an order
@@ -152,6 +178,7 @@ export function useOrders() {
   return {
     createOrder,
     getOrder,
+    getSaleOrder,
     markPaymentAsSent,
     completeOrder,
     cancelOrder,

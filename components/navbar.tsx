@@ -40,6 +40,12 @@ export function Navbar() {
           {/* Desktop Navigation */}
           {address && (
             <nav className="hidden md:flex items-center gap-6">
+                <Link
+                href="/dashboard"
+                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/dashboard" ? "text-primary" : "text-foreground/60"}`}
+                >
+                Dashboard
+                </Link>
               <Link
                 href="/listings"
                 className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/listings" ? "text-primary" : "text-foreground/60"}`}
@@ -52,12 +58,6 @@ export function Navbar() {
               >
                 Manage Orders
               </Link>
-                <Link
-                href="/dashboard"
-                className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/dashboard" ? "text-primary" : "text-foreground/60"}`}
-                >
-                Dashboard
-                </Link>
                 <Link
                 href="/bridge"
                 className={`text-sm font-medium transition-colors hover:text-primary ${pathname === "/bridge" ? "text-primary" : "text-foreground/60"}`}

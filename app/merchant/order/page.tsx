@@ -27,7 +27,6 @@ interface Order {
   updatedAt: number | string
 }
 
-// Helper functions for formatting
 const formatTokenAmount = (amount: bigint | number): string => {
   if (typeof amount === "bigint") {
     return (Number(amount) / 1000000000).toString()
@@ -44,7 +43,7 @@ const formatPrice = (price: bigint | number): string => {
 
 export default function MerchantOrdersPage() {
   const { address } = useSuiWallet()
-  const { getAllOrders, getOrdersBySeller } = useContract()
+  const { getAllOrders, getOrdersBySeller, getSaleOrdersByBuyer } = useContract()
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([])
@@ -71,7 +70,13 @@ export default function MerchantOrdersPage() {
 
     const loadOrders = async () => {
       try {
-        const fetched = await getOrdersBySeller(address)
+        // fetch orders where user is seller…
+        const sellerOrders = await getOrdersBySeller(address)
+        // …and sale-orders where user is buyer
+        const buyerSaleOrders = await getSaleOrdersByBuyer(address)
+        // merge both lists
+        const fetched = [...sellerOrders, ...buyerSaleOrders]
+
         console.log("Fetched orders:", fetched)
 
         const uiOrders: Order[] = fetched.map((o: any) => ({
@@ -106,7 +111,7 @@ export default function MerchantOrdersPage() {
     }
 
     loadOrders()
-  }, [address, router, getOrdersBySeller])
+  }, [address, router, getOrdersBySeller, getSaleOrdersByBuyer])
 
   useEffect(() => {
     let filtered = orders
