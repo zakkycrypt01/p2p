@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, use } from "react"
 import { useRouter } from "next/navigation"
 import { useSuiWallet } from "@/hooks/use-sui-wallet"
 import { Button } from "@/components/ui/button"
@@ -16,9 +16,9 @@ import { useOrders } from "@/hooks/use-orders"
 import { formatDistanceToNow } from "date-fns"
 
 interface ChatPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{
+    id: string;
+  }>;
 }
 
 interface Message {
@@ -32,6 +32,8 @@ interface Message {
 }
 
 export default function MerchantChatPage({ params }: ChatPageProps) {
+  const { id } = use(params)
+
   const { address } = useSuiWallet()
   const router = useRouter()
   const { toast } = useToast()
@@ -48,21 +50,18 @@ export default function MerchantChatPage({ params }: ChatPageProps) {
   useEffect(() => {
     const fetchOrder = async () => {
       if (!address) {
-        router.push("/")
         return
       }
 
       setIsLoading(true)
       try {
-        const fetchedOrder = await getOrder({ id: params.id })
+        const fetchedOrder = await getOrder({ id })
 
         if (fetchedOrder) {
           setOrder(fetchedOrder)
-          // Determine counterparty address - for merchant, it's the buyer
           const counterparty = fetchedOrder.buyer
           setCounterpartyAddress(counterparty)
 
-          // Load mock messages for demo
           const mockMessages = generateMockMessages(address, counterparty, fetchedOrder)
           setMessages(mockMessages)
         }
@@ -79,9 +78,8 @@ export default function MerchantChatPage({ params }: ChatPageProps) {
     }
 
     fetchOrder()
-  }, [address, params.id, router, toast, getOrder])
+  }, [address, id, router, toast, getOrder])
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
@@ -91,7 +89,6 @@ export default function MerchantChatPage({ params }: ChatPageProps) {
     const oneHourAgo = now - 60 * 60 * 1000
     const twoHoursAgo = now - 2 * 60 * 60 * 1000
 
-    // For merchant view, we'll show a payment proof from the buyer
     return [
       {
         id: "1",
@@ -140,11 +137,9 @@ export default function MerchantChatPage({ params }: ChatPageProps) {
     setMessages((prev) => [...prev, newMessage])
     setMessage("")
 
-    // Simulate message being sent
     setTimeout(() => {
       setMessages((prev) => prev.map((msg) => (msg.id === newMessage.id ? { ...msg, status: "delivered" } : msg)))
 
-      // Simulate reply for demo purposes
       if (Math.random() > 0.7) {
         setTimeout(() => {
           const reply: Message = {
@@ -177,13 +172,9 @@ export default function MerchantChatPage({ params }: ChatPageProps) {
 
     setIsUploading(true)
 
-    // In a real app, you would upload the file to a server here
-    // For this demo, we'll simulate an upload with a timeout
     setTimeout(() => {
-      // Generate a placeholder URL for the demo
       const mockProofUrl = "/placeholder.svg?height=300&width=400"
 
-      // Add a message with the proof
       const proofMessage: Message = {
         id: Date.now().toString(),
         sender: address || "",
@@ -209,8 +200,6 @@ export default function MerchantChatPage({ params }: ChatPageProps) {
   }
 
   const handleDownloadProof = (proofUrl: string) => {
-    // In a real app, you would trigger a download here
-    // For this demo, we'll just show a toast
     toast({
       title: "Download started",
       description: "The payment proof is being downloaded",
@@ -222,7 +211,7 @@ export default function MerchantChatPage({ params }: ChatPageProps) {
       <div className="container mx-auto py-8 px-4 max-w-4xl">
         <div className="flex items-center mb-6">
           <Button variant="ghost" size="sm" asChild className="mr-4">
-            <Link href={`/merchant/order/${params.id}`}>
+            <Link href={`/merchant/order/${id}`}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Order
             </Link>
@@ -242,7 +231,7 @@ export default function MerchantChatPage({ params }: ChatPageProps) {
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       <div className="flex items-center mb-6">
         <Button variant="ghost" size="sm" asChild className="mr-4">
-          <Link href={`/merchant/order/${params.id}`}>
+          <Link href={`/merchant/order/${id}`}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Order
           </Link>
@@ -261,7 +250,7 @@ export default function MerchantChatPage({ params }: ChatPageProps) {
                 {counterpartyAddress.slice(0, 6)}...{counterpartyAddress.slice(-4)}
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Order #{params.id.slice(0, 6)}...{params.id.slice(-4)}
+                Order #{id.slice(0, 6)}...{id.slice(-4)}
               </p>
             </div>
           </div>

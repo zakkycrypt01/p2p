@@ -493,11 +493,9 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                   </div>
                 </div>
 
-                {/* Time remaining - using the CountdownTimer component */}
                 {(formattedOrder.status === "pending_payment" || formattedOrder.status === "payment_sent") &&
                   expiryTimestamp && <CountdownTimer expiryTimestamp={expiryTimestamp} onExpire={handleOrderExpiry} />}
 
-                {/* Payment instructions for pending payment */}
                 {formattedOrder.status === "pending_payment" && (
                   <>
                     <div className="bg-primary/10 p-4 rounded-lg border border-primary/20">
@@ -529,7 +527,6 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                         </TabsList>
 
                         {formattedOrder.paymentMethods.map((method: string) => {
-                          // Use lowercase method name for lookup
                           const methodKey = method.toLowerCase()
                           const details = formattedOrder.paymentDetails[methodKey]
 

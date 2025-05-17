@@ -949,7 +949,7 @@ export default function OrderDetailPage() {
             <CardContent className="space-y-4">
               {/* Chat button */}
               <Button variant="outline" className="w-full" asChild>
-                <Link href={`/chat/${formattedOrder.id}`} className="flex items-center justify-center">
+                <Link href={`/merchant/order/${formattedOrder.id}/chat`} className="flex items-center justify-center">
                   <MessageCircle className="h-4 w-4 mr-2" />
                   Chat with {isMerchantBuying ? "Seller" : "Buyer"}
                   {formattedOrder?.status === "payment_sent" && (
