@@ -5,11 +5,18 @@ import Link from "next/link"
 import { useCurrentAccount } from "@mysten/dapp-kit"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Eye } from "lucide-react"
-import {useContract } from "@/hooks/useContract"
+import { useContract } from "@/hooks/useContract"
 
 export interface Trade {
   id: string
@@ -23,58 +30,60 @@ export interface Trade {
   createdAt: string
 }
 
-const statusMapping: Record<number, "pending" | "completed" | "refunded" | "disputed"> = {
+const statusMapping: Record<number, Trade["status"]> = {
   0: "pending",
   1: "disputed",
   2: "refunded",
   3: "completed",
-};
-
-function mapOrderStatus(status: number): "pending" | "completed" | "refunded" | "disputed" {
-  return statusMapping[status] || "pending";
 }
 
-export function MyTrades() {
+function mapOrderStatus(status: number): Trade["status"] {
+  return statusMapping[status] || "pending"
+}
+
+interface MyTradesProps {
+  limit?: number
+  showViewAll?: () => void
+}
+
+export function MyTrades({ limit, showViewAll }: MyTradesProps) {
   const currentAccount = useCurrentAccount()
   const address = currentAccount?.address
   const [trades, setTrades] = useState<Trade[]>([])
   const [isLoading, setIsLoading] = useState(true)
-
-  const {getAllOrders, markPaymentMade, getOrdersByBuyer} = useContract()
+  const { getOrdersByBuyer } = useContract()
 
   useEffect(() => {
     if (!address) return
-    const fetchOrders = async () => {
-      try {
-        const orders = await getOrdersByBuyer(address)
+    setIsLoading(true)
+    getOrdersByBuyer(address)
+      .then((orders) => {
         const tradesData = orders.map((order) => ({
           id: order.id,
           tokenSymbol: order.metadata?.tokenSymbol || "SUI",
           amount: Number(order.tokenAmount) / 1e9,
-          price: Number(order.price) / 1e10, 
+          price: Number(order.price) / 1e10,
           fiatCurrency: "USD",
           counterparty: order.seller,
           role: "buyer" as "buyer" | "seller",
           status: mapOrderStatus(order.status),
           createdAt: new Date(order.createdAt).toISOString(),
         }))
-        console.log('tradeData :>> ', tradesData);
         setTrades(tradesData)
-      } catch (error) {
-        console.error("Failed to fetch orders:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    
-    fetchOrders();
-  }, [address, getOrdersByBuyer]);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setIsLoading(false))
+  }, [address, getOrdersByBuyer])
 
   if (!address) {
     return (
       <Card className="p-6 text-center">
-        <p className="text-muted-foreground mb-4">Connect your wallet to view your trades</p>
-        <Button onClick={() => window.scrollTo(0, 0)}>Connect Wallet</Button>
+        <p className="text-muted-foreground mb-4">
+          Connect your wallet to view your trades
+        </p>
+        <Button onClick={() => window.scrollTo(0, 0)}>
+          Connect Wallet
+        </Button>
       </Card>
     )
   }
@@ -99,15 +108,24 @@ export function MyTrades() {
     )
   }
 
+  const display = limit != null ? trades.slice(0, limit) : trades
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Your Trades</h3>
+        {showViewAll && (
+          <Button size="sm" onClick={showViewAll}>
+            View All
+          </Button>
+        )}
       </div>
 
-      {trades.length === 0 ? (
+      {display.length === 0 ? (
         <Card className="p-6 text-center">
-          <p className="text-muted-foreground mb-4">You don't have any trades yet</p>
+          <p className="text-muted-foreground mb-4">
+            You don't have any trades yet
+          </p>
           <Button asChild>
             <Link href="/">Browse Listings</Link>
           </Button>
@@ -127,7 +145,7 @@ export function MyTrades() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {trades.map((trade) => (
+              {display.map((trade) => (
                 <TableRow key={trade.id}>
                   <TableCell className="font-medium">{trade.tokenSymbol}</TableCell>
                   <TableCell>{trade.amount}</TableCell>

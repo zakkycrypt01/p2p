@@ -76,7 +76,9 @@ export function TradeDetail({ listing }: TradeDetailProps) {
         ? listing.amount * 0.4
         : listing.amount
 
-  const totalAmount = listing.totalAmount !== undefined ? listing.totalAmount : listing.amount
+  // Total amount is always the original listing amount
+  const totalAmount = listing.amount
+
   const soldAmount = totalAmount - availableAmount
   const soldPercentage = (soldAmount / totalAmount) * 100
 
