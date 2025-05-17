@@ -198,7 +198,6 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isConfirming, setIsConfirming] = useState(false)
-  const [isReleasing, setIsReleasing] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [isDisputing, setIsDisputing] = useState(false)
   const [expiryTimestamp, setExpiryTimestamp] = useState<number | null>(null)
@@ -342,28 +341,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  const handleReleaseFunds = async () => {
-    setIsReleasing(true)
-    try {
-      await markPaymentReceived(order.id)
-      setFormattedOrder((prev: any) => ({ ...prev, status: "completed" }))
-
-      toast({
-        title: "Funds released",
-        description: "You have successfully released the funds",
-      })
-    } catch (error) {
-      console.error("Error releasing funds:", error)
-      toast({
-        title: "Error",
-        description: "Failed to release funds",
-        variant: "destructive",
-      })
-    } finally {
-      setIsReleasing(false)
-    }
-  }
-
   const handleCancelOrder = async () => {
     setIsCancelling(true)
     try {
@@ -489,7 +466,6 @@ export default function OrderDetailPage() {
   const isMerchantBuying = formattedOrder.orderType === "buy"
   const isMerchantSelling = !isMerchantBuying
   const canConfirmPayment = formattedOrder.status === "payment_sent" && isMerchantSelling
-  const canReleaseFunds = formattedOrder.status === "payment_confirmed" && isMerchantSelling
   const canCancel = formattedOrder.status === "pending_payment" || formattedOrder.status === "payment_sent"
   const canDispute =
     formattedOrder.status !== "completed" &&
@@ -995,18 +971,6 @@ export default function OrderDetailPage() {
                       </div>
                       <Button className="w-full" onClick={handleConfirmPayment} disabled={isConfirming}>
                         {isConfirming ? "Processing..." : "Confirm Payment Received"}
-                      </Button>
-                    </div>
-                  )}
-
-                  {canReleaseFunds && (
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2 p-2 bg-muted rounded-md mb-2">
-                        <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
-                        <p className="text-xs">Once you release the funds, this action cannot be undone.</p>
-                      </div>
-                      <Button className="w-full" onClick={handleReleaseFunds} disabled={isReleasing}>
-                        {isReleasing ? "Processing..." : "Release Funds to Buyer"}
                       </Button>
                     </div>
                   )}
