@@ -135,23 +135,11 @@ export function useOrders() {
   )
 
  const cancelOrder = useCallback(
-  async (orderId: string) => {
-    try {
-      console.log('Cancelling order with orderId :>> ', orderId);
-      const txDigest = await cancelOrder(orderId);
-      if (txDigest) {
-        console.log('Order cancelled successfully, tx:', txDigest);
-        // Optionally, show a toast/notification here
-      } else {
-        console.warn('Order cancellation failed or was cancelled by user');
-      }
-    } catch (err) {
-      console.error('Error cancelling order:', err);
-      // Optionally, show a toast/notification here
-    }
-  },
-  [cancelOrder],
-)
+    (orderId: string) => {
+      console.log('orderId :>> ', orderId);
+    },
+    [],
+  )
 
   // Open a dispute
   const openDispute = useCallback(
