@@ -42,8 +42,8 @@ export function MyListings({ limit, showViewAll }: MyListingsProps) {
         const raw = await getListingsBySeller(address)
         const formatted: Listing[] = raw.map((l) => ({
           id: l.id,
-          tokenSymbol: l.metadata.symbol ?? "",
-          amount: Number(l.remainingAmount),
+          tokenSymbol: l.metadata.symbol ?? "SUI",
+          amount: Number(l.tokenAmount) / 1e9, 
           price: Number(l.price),
           fiatCurrency: l.metadata.fiatCurrency ?? "USD",
           status:
