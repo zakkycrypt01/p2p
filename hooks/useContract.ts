@@ -989,21 +989,22 @@ export function useContract() {
 
   // Cancel order (by buyer)
   const cancelOrder = async (orderId: string): Promise<string | null> => {
-    toast({
-      title: "Cancelling order",
-      description: "Please confirm the transaction in your wallet",
-      variant: "default",
-    })
+  toast({
+    title: "Cancelling order",
+    description: "Please confirm the transaction in your wallet",
+    variant: "default",
+  })
 
-    const tx = new Transaction()
+  const tx = new Transaction()
 
-    tx.moveCall({
-      target: `${MarketplacePackageId}::${MODULE_NAME}::cancel_order`,
-      arguments: [tx.object(orderId), tx.object(SUI_CLOCK_OBJECT_ID)],
-    })
+  tx.moveCall({
+    target: `${MarketplacePackageId}::${MODULE_NAME}::cancel_order`,
+    typeArguments: ["0x2::sui::SUI"],
+    arguments: [tx.object(orderId), tx.object(SUI_CLOCK_OBJECT_ID)],
+  })
 
-    return handleTransaction(tx)
-  }
+  return handleTransaction(tx)
+}
 
   // Process expired order
   const processExpiredOrder = async (orderId: string): Promise<string | null> => {
