@@ -17,7 +17,7 @@ interface Listing {
   amount: number
   price: number
   fiatCurrency: string
-  status: "open" | "pending" | "completed" | "cancelled"
+  status: "open" | "sold" | "partially sold" | "cancelled"
   createdAt: string
 }
 
@@ -50,9 +50,9 @@ export function MyListings({ limit, showViewAll }: MyListingsProps) {
             l.status === 0
               ? "open"
               : l.status === 1
-              ? "pending"
+              ? "sold"
               : l.status === 2
-              ? "completed"
+              ? "partially sold"
               : "cancelled",
           createdAt: new Date(l.createdAt * 1000).toISOString(),
         }))
@@ -143,9 +143,9 @@ export function MyListings({ limit, showViewAll }: MyListingsProps) {
                       variant={
                         listing.status === "open"
                           ? "outline"
-                          : listing.status === "pending"
+                          : listing.status === "sold"
                             ? "secondary"
-                            : listing.status === "completed"
+                            : listing.status === "partially sold"
                               ? "default"
                               : "destructive"
                       }

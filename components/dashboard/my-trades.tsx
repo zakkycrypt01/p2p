@@ -25,9 +25,9 @@ export interface Trade {
 
 const statusMapping: Record<number, "pending" | "completed" | "refunded" | "disputed"> = {
   0: "pending",
-  1: "completed",
+  1: "disputed",
   2: "refunded",
-  3: "disputed",
+  3: "completed",
 };
 
 function mapOrderStatus(status: number): "pending" | "completed" | "refunded" | "disputed" {
