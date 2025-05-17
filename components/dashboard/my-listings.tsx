@@ -21,7 +21,12 @@ interface Listing {
   createdAt: string
 }
 
-export function MyListings() {
+interface MyListingsProps {
+  limit?: number
+  showViewAll?: () => void
+}
+
+export function MyListings({ limit, showViewAll }: MyListingsProps) {
   const currentAccount = useCurrentAccount()
   const address = currentAccount?.address
   const [listings, setListings] = useState<Listing[]>([])
@@ -34,9 +39,7 @@ export function MyListings() {
     const fetchListings = async () => {
       setIsLoading(true)
       try {
-        // fetch raw on‐chain structs
         const raw = await getListingsBySeller(address)
-        console.log('raw :>> ', raw);
         const formatted: Listing[] = raw.map((l) => ({
           id: l.id,
           tokenSymbol: l.metadata.symbol ?? "",
@@ -51,7 +54,6 @@ export function MyListings() {
               : l.status === 2
               ? "completed"
               : "cancelled",
-          // convert timestamp to ISO string (or .toLocaleDateString())
           createdAt: new Date(l.createdAt * 1000).toISOString(),
         }))
         setListings(formatted)
@@ -63,7 +65,7 @@ export function MyListings() {
     }
 
     fetchListings()
-  }, [address])
+  }, [address, getListingsBySeller])
 
   if (!address) {
     return (
@@ -95,19 +97,20 @@ export function MyListings() {
     )
   }
 
+  const display = limit != null ? listings.slice(0, limit) : listings
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Your Listings</h3>
-        <Button asChild size="sm">
-          <Link href="/listings/new">
-            <Plus className="h-4 w-4 mr-2" />
-            New Listing
-          </Link>
-        </Button>
+        {showViewAll && (
+          <Button size="sm" onClick={showViewAll}>
+            View All
+          </Button>
+        )}
       </div>
 
-      {listings.length === 0 ? (
+      {display.length === 0 ? (
         <Card className="p-6 text-center">
           <p className="text-muted-foreground mb-4">You don't have any listings yet</p>
           <Button asChild>
@@ -128,7 +131,7 @@ export function MyListings() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {listings.map((listing) => (
+              {display.map((listing) => (
                 <TableRow key={listing.id}>
                   <TableCell className="font-medium">{listing.tokenSymbol}</TableCell>
                   <TableCell>{listing.amount}</TableCell>

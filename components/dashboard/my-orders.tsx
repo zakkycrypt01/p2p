@@ -55,11 +55,8 @@ export function MyOrders() {
 
       setIsLoading(true)
       try {
-        // Fetch orders where the current user is the buyer
-        // ensure we always have an array back
         const fetchedOrders = (await getOrdersByBuyer(address)) || []
 
-        // Transform the orders for UI display
         const transformedOrders = fetchedOrders.map((order: any) => ({
           id: order.id,
           tokenSymbol: "SUI",

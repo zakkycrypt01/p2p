@@ -153,7 +153,7 @@ export function MyTrades() {
                   <TableCell>{new Date(trade.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
                     <Button asChild size="sm" variant="ghost">
-                      <Link href={`/listings/${trade.id}`}>
+                      <Link href={`/orders/${trade.id}`}>
                         <Eye className="h-4 w-4 mr-2" />
                         View
                       </Link>
