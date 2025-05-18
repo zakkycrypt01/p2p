@@ -766,6 +766,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
               <CardContent className="space-y-4">
                 {formattedOrder.status === "pending_payment" && (
                   <>
+                    <ChatButton orderId={order.id} className="w-full mb-2" />
                     <Button className="w-full" onClick={handleMarkPaymentSent} disabled={isConfirming}>
                       {isConfirming ? "Processing..." : "I've Sent the Payment"}
                     </Button>

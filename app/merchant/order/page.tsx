@@ -70,12 +70,12 @@ export default function MerchantOrdersPage() {
 
     const loadOrders = async () => {
       try {
-        // fetch orders where user is seller…
         const sellerOrders = await getOrdersBySeller(address)
-        // …and sale-orders where user is buyer
         const buyerSaleOrders = await getSaleOrdersByBuyer(address)
-        // merge both lists
-        const fetched = [...sellerOrders, ...buyerSaleOrders]
+        const merged = [...sellerOrders, ...buyerSaleOrders]
+        const fetched = Array.from(
+          new Map(merged.map((o: any) => [o.id, o])).values()
+        )
 
         console.log("Fetched orders:", fetched)
 
