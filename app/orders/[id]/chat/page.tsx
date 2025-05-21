@@ -1,334 +1,99 @@
 "use client"
-
-import type React from "react"
-
-import { useState, useEffect, useRef } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useSuiWallet } from "@/hooks/use-sui-wallet"
+import { useZKChat } from "@/hooks/use-zk-chat"
+import { ZKChatMessage } from "@/components/chat/zk-chat-message"
+import { ZKChatInput } from "@/components/chat/zk-chat-input"
+import { Shield, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { useToast } from "@/components/ui/use-toast"
-import { ArrowLeft, Send, Upload, Paperclip, Clock } from "lucide-react"
 import Link from "next/link"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { useOrders } from "@/hooks/use-orders"
-import { formatDistanceToNow } from "date-fns"
-
-interface Message {
-  id: string
-  sender: string
-  content: string
-  timestamp: number
-  isProof?: boolean
-  proofUrl?: string
-  status: "sending" | "sent" | "delivered" | "read"
-}
+import OrderDetailPage from "@/app/orders/[id]/page"
 
 export default function ChatPage() {
-  const { id } = useParams()
+  const params = useParams()
+  const orderId = params.id as string
   const { address } = useSuiWallet()
-  const router = useRouter()
-  const { toast } = useToast()
-  const { getOrder, uploadPaymentProof } = useOrders()
-  const [order, setOrder] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [message, setMessage] = useState("")
-  const [messages, setMessages] = useState<Message[]>([])
-  const [counterpartyAddress, setCounterpartyAddress] = useState("")
-  const [isUploading, setIsUploading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const counterpartyAddress = params.counterparty as string
+  const { messages, isLoading, isInitializing, sendMessage, uploadFile, isEncrypted, isAuthenticated } = useZKChat({
+    orderId,
+    autoFetchMessages: true,
+  })
 
-  useEffect(() => {
-    const fetchOrder = async () => {
-      if (!address) {
-        router.push("/")
-        return
-      }
-
-      setIsLoading(true)
-      try {
-        if (!id || typeof id !== "string") {
-          throw new Error("Invalid order ID");
-        }
-        const fetchedOrder = await getOrder({ id });
-
-        if (fetchedOrder) {
-          setOrder(fetchedOrder)
-          // Determine counterparty address
-          const counterparty = fetchedOrder.buyer === address ? fetchedOrder.seller : fetchedOrder.buyer
-          setCounterpartyAddress(counterparty)
-
-          // Load mock messages for demo
-          const mockMessages = generateMockMessages(address, counterparty, fetchedOrder)
-          setMessages(mockMessages)
-        }
-      } catch (error) {
-        console.error("Error fetching order:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load order details",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchOrder()
-  }, [address, id, router, toast, getOrder])
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
-
-  const generateMockMessages = (userAddress: string, counterparty: string, order: any): Message[] => {
-    const now = Date.now()
-    const oneHourAgo = now - 60 * 60 * 1000
-    const twoHoursAgo = now - 2 * 60 * 60 * 1000
-
-    return [
-      {
-        id: "1",
-        sender: counterparty,
-        content: "Hello! Thank you for your order. Please let me know when you've sent the payment.",
-        timestamp: twoHoursAgo,
-        status: "read",
-      },
-      {
-        id: "2",
-        sender: userAddress,
-        content: "Hi! I'm about to make the payment. Do you prefer I send you the receipt here?",
-        timestamp: twoHoursAgo + 5 * 60 * 1000,
-        status: "read",
-      },
-      {
-        id: "3",
-        sender: counterparty,
-        content: "Yes, please upload the payment proof here once you've made the transfer.",
-        timestamp: twoHoursAgo + 10 * 60 * 1000,
-        status: "read",
-      },
-    ]
+  const handleSendMessage = async (message: string, isAnonymous: boolean) => {
+    await sendMessage(message, isAnonymous)
   }
 
-  const handleSendMessage = () => {
-    if (!message.trim()) return
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      sender: address || "",
-      content: message,
-      timestamp: Date.now(),
-      status: "sending",
-    }
-
-    setMessages((prev) => [...prev, newMessage])
-    setMessage("")
-
-    // Simulate message being sent
-    setTimeout(() => {
-      setMessages((prev) => prev.map((msg) => (msg.id === newMessage.id ? { ...msg, status: "delivered" } : msg)))
-
-      // Simulate reply for demo purposes
-      if (Math.random() > 0.5) {
-        setTimeout(() => {
-          const reply: Message = {
-            id: Date.now().toString(),
-            sender: counterpartyAddress,
-            content: "Thanks for the update! I'll check it shortly.",
-            timestamp: Date.now(),
-            status: "delivered",
-          }
-          setMessages((prev) => [...prev, reply])
-        }, 10000) // Reply after 10 seconds
-      }
-    }, 1000)
+  const handleSendFile = async (file: File, isAnonymous: boolean) => {
+    await uploadFile(file, isAnonymous)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setIsUploading(true)
-
-    // In a real app, you would upload the file to a server here
-    // For this demo, we'll simulate an upload with a timeout
-    setTimeout(() => {
-      // Generate a placeholder URL for the demo
-      const mockProofUrl = "/placeholder.svg?height=300&width=400"
-
-      // Call the uploadPaymentProof function
-      if (typeof id === "string") {
-        uploadPaymentProof(id, mockProofUrl)
-      } else {
-        console.error("Invalid order ID: id is not a string")
-      }
-
-      // Add a message with the proof
-      const proofMessage: Message = {
-        id: Date.now().toString(),
-        sender: address || "",
-        content: "I've sent the payment. Here's the proof of payment.",
-        timestamp: Date.now(),
-        isProof: true,
-        proofUrl: mockProofUrl,
-        status: "sent",
-      }
-
-      setMessages((prev) => [...prev, proofMessage])
-      setIsUploading(false)
-
-      toast({
-        title: "Proof uploaded",
-        description: "Your payment proof has been uploaded successfully",
-      })
-
-      // Simulate reply for demo
-      setTimeout(() => {
-        const reply: Message = {
-          id: Date.now().toString(),
-          sender: counterpartyAddress,
-          content: "Thank you for the payment proof. I'll verify it and release the funds shortly.",
-          timestamp: Date.now(),
-          status: "delivered",
-        }
-        setMessages((prev) => [...prev, reply])
-      }, 5000)
-    }, 2000)
-  }
-
-  const formatMessageTime = (timestamp: number) => {
-    return formatDistanceToNow(timestamp, { addSuffix: true })
-  }
-
-  if (isLoading) {
+  if (isInitializing) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
-        <div className="flex items-center mb-6">
-          <Button variant="ghost" size="sm" asChild className="mr-4">
-            <Link href={`/orders/${id}`}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Order
-            </Link>
-          </Button>
-          <h1 className="text-3xl font-bold">Chat</h1>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 bg-muted rounded-full mb-4"></div>
+          <div className="h-4 w-48 bg-muted rounded mb-2"></div>
+          <div className="h-3 w-32 bg-muted rounded"></div>
         </div>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p>Loading chat...</p>
-          </CardContent>
-        </Card>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-4xl">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" size="sm" asChild className="mr-4">
-          <Link href={`/orders/${id}`}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Order
+    <div className="container max-w-4xl mx-auto py-6 px-4">
+      <div className="mb-6">
+        <Button variant="ghost" size="sm" asChild className="mb-2">
+          <Link href={`/orders/${orderId}`}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back to Order
           </Link>
         </Button>
-        <h1 className="text-3xl font-bold">Chat</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Secure Chat</h1>
+          {isAuthenticated && (
+            <div className="flex items-center text-sm text-green-500">
+              <Shield className="h-4 w-4 mr-1" />
+              <span>ZK Protected</span>
+            </div>
+          )}
+        </div>
+        <p className="text-muted-foreground">Order #{orderId.slice(0, 8)}</p>
       </div>
 
-      <Card className="h-[calc(100vh-200px)] flex flex-col">
-        <CardHeader className="border-b">
-          <div className="flex items-center">
-            <Avatar className="h-10 w-10 mr-3">
-              <AvatarFallback>{counterpartyAddress.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div>
-              <CardTitle className="text-lg">
-                {counterpartyAddress.slice(0, 6)}...{counterpartyAddress.slice(-4)}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Order #{(id ?? "").slice(0, 6)}...{(id ?? "").slice(-4)}
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.sender === address ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[80%] ${
-                  msg.sender === address ? "bg-primary text-primary-foreground" : "bg-muted"
-                } rounded-lg p-3 space-y-2`}
-              >
-                <div className="text-sm">{msg.content}</div>
-
-                {msg.isProof && msg.proofUrl && (
-                  <div className="mt-2 bg-background/20 p-2 rounded-md">
-                    <div className="text-xs mb-1">Payment Proof:</div>
-                    <img
-                      src={msg.proofUrl || "/placeholder.svg"}
-                      alt="Payment proof"
-                      className="w-full max-h-60 object-contain rounded-md"
-                    />
-                  </div>
-                )}
-
-                <div className="flex items-center justify-end gap-1 text-xs opacity-70">
-                  <span>{formatMessageTime(msg.timestamp)}</span>
-                  {msg.sender === address && (
-                    <span>
-                      {msg.status === "sending" && "Sending..."}
-                      {msg.status === "sent" && "Sent"}
-                      {msg.status === "delivered" && "Delivered"}
-                      {msg.status === "read" && "Read"}
-                    </span>
-                  )}
-                </div>
+      <div className="bg-card rounded-lg shadow-sm border p-4">
+        <div className="space-y-4 mb-4 max-h-[500px] overflow-y-auto">
+          {isLoading && messages.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="animate-pulse space-y-3">
+                <div className="h-10 bg-muted rounded w-3/4 mx-auto"></div>
+                <div className="h-10 bg-muted rounded w-1/2 mx-auto"></div>
+                <div className="h-10 bg-muted rounded w-2/3 mx-auto"></div>
               </div>
             </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </CardContent>
-        <div className="p-4 border-t">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="shrink-0"
-              onClick={handleUploadClick}
-              disabled={isUploading}
-            >
-              {isUploading ? <Clock className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-            </Button>
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-            <Button variant="outline" size="icon" className="shrink-0">
-              <Paperclip className="h-5 w-5" />
-            </Button>
-            <Input
-              placeholder="Type a message..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="flex-1"
-            />
-            <Button className="shrink-0" size="icon" onClick={handleSendMessage} disabled={!message.trim()}>
-              <Send className="h-5 w-5" />
-            </Button>
-          </div>
+          ) : messages.length === 0 ? (
+            <div className="text-center py-12">
+              <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-medium mb-2">No messages yet</h3>
+              <p className="text-muted-foreground">Start the conversation about your order.</p>
+            </div>
+          ) : (
+            messages.map((message, index) => (
+              <ZKChatMessage
+                key={`${message.orderId}-${index}`} // Ensure uniqueness by combining orderId and index
+                message={message}
+                currentUser={address || ""}
+              />
+            ))
+          )}
         </div>
-      </Card>
+
+        <ZKChatInput
+          onSendMessageAction={handleSendMessage}
+          onSendFileAction={handleSendFile}
+          isLoading={isLoading}
+          isEncrypted={isEncrypted}
+          isAuthenticated={isAuthenticated}
+        />
+      </div>
     </div>
   )
 }
