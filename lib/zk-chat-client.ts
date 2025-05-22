@@ -26,94 +26,72 @@ export interface SendMessageParams {
 }
 
 export class ZKChatClient {
-  private baseURL: string;
+  private apiUrl: string;
 
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
+  constructor(apiUrl: string) {
+    this.apiUrl = apiUrl;
   }
 
-  /**
-   * Initialize the ZKChatClient
-   */
   async initialize(): Promise<void> {
-    try {
-      const response = await fetch(`${this.baseURL}/api/health`, {
-        method: "GET",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to connect to the server");
-      }
-
-      console.log("ZKChatClient initialized successfully");
-    } catch (error) {
-      console.error("Error during ZKChatClient initialization:", error);
-      throw error;
-    }
+    // Initialization logic here
   }
 
-  async uploadFile(fileData: {
-    orderId: string;
-    sender: string;
-    recipient: string;
-    file: File;
-    timestamp: number;
-  }) {
-    // Logic to handle file upload
-    console.log("Uploading file:", fileData.file.name);
-    return { success: true };
-  }
-  /**
-   * Get messages for a public key
-   */
-  async getMessages(publicKey: string): Promise<Message[]> {
-    try {
-      const response = await fetch(`${this.baseURL}/api/messages?publicKey=${encodeURIComponent(publicKey)}`, {
-        method: "GET",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch messages: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-      throw error;
+  async getMessages(publicKey: string, orderId: string): Promise<Message[]> {
+    const response = await fetch(`${this.apiUrl}/api/messages?publicKey=${publicKey}&orderId=${orderId}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch messages");
     }
+    return await response.json();
   }
-  
-  
 
-  /**
-   * Send a message
-   */
-  async sendMessage(params: SendMessageParams): Promise<Message> {
-    const { orderId, sender, recipient ,message, timestamp } = params;
-
-    try {
-      const response = await fetch(`${this.baseURL}/api/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId,
-          sender,
-          recipient,
-          message,
-          timestamp,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Error sending message:", error);
-      throw error;
+  async sendMessage(data: { orderId: string; sender: string; recipient: string; message: string; timestamp: number }): Promise<Message> {
+    console.log("Sending payload:", data); // Log the payload
+    const response = await fetch(`${this.apiUrl}/api/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const errorText = await response.text(); // Log server response for debugging
+      console.error("Server error response:", errorText);
+      throw new Error("Failed to send message");
     }
+    return await response.json();
+  }
+
+  async uploadFile(data: { orderId: string; sender: string; recipient: string; file: File; timestamp: number }): Promise<{ success: boolean }> {
+    const formData = new FormData();
+    formData.append("orderId", data.orderId);
+    formData.append("sender", data.sender);
+    formData.append("recipient", data.recipient);
+    formData.append("file", data.file);
+    formData.append("timestamp", data.timestamp.toString());
+
+    const response = await fetch(`${this.apiUrl}/files`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      throw new Error("Failed to upload file");
+    }
+    return await response.json();
+  }
+
+  async pollMessages(publicKey: string, orderId: string, callback: (messages: Message[]) => void): Promise<void> {
+    setInterval(async () => {
+      try {
+        const messages = await this.getMessages(publicKey, orderId);
+
+        const enrichedMessages = messages.map((msg) => ({
+          ...msg,
+          content: msg.message || null, 
+          status: msg.status || "sent", 
+        }));
+
+        callback(enrichedMessages);
+      } catch (error) {
+        console.error("Error polling messages:", error);
+      }
+    }, 30000); // 1 minute interval
   }
 }

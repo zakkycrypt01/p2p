@@ -39,7 +39,8 @@ export function useZKChat({ orderId, counterpartyAddress, autoFetchMessages = tr
     const initializeChat = async () => {
       setIsInitializing(true)
       try {
-        const newClient = new ZKChatClient("http://localhost:2001") // Update with the actual HTTP server URL
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:2001"
+        const newClient = new ZKChatClient(apiUrl)
         await newClient.initialize()
         setClient(newClient)
 
@@ -47,9 +48,9 @@ export function useZKChat({ orderId, counterpartyAddress, autoFetchMessages = tr
         if (autoFetchMessages && address) {
           setIsLoading(true)
           try {
-            const messages = await newClient.getMessages(address)
+            const initialMessages = await newClient.getMessages(address, orderId)
             setMessages(
-              messages.map((msg) => ({
+              initialMessages.map((msg) => ({
                 orderId: msg.orderId || Date.now().toString(),
                 sender: msg.sender,
                 content: msg.message || null,
@@ -68,6 +69,28 @@ export function useZKChat({ orderId, counterpartyAddress, autoFetchMessages = tr
           } finally {
             setIsLoading(false)
           }
+        }
+
+        if (autoFetchMessages && address) {
+          newClient.pollMessages(address, orderId, (newMessages) => {
+            setMessages((prevMessages) => {
+              const existingMessages = new Set(
+                prevMessages.map((msg) => `${msg.timestamp}-${msg.content}`)
+              )
+
+              const filteredMessages = newMessages.filter(
+                (msg) => !existingMessages.has(`${msg.timestamp}-${msg.message}`)
+              )
+
+              return [
+                ...prevMessages,
+                ...filteredMessages.map((msg) => ({
+                  ...msg,
+                  status: msg.status || "sent", 
+                })),
+              ]
+            })
+          })
         }
       } catch (error) {
         console.error("Error initializing chat:", error)
@@ -88,7 +111,6 @@ export function useZKChat({ orderId, counterpartyAddress, autoFetchMessages = tr
     async (content: string, isAnonymous = false) => {
       if (!content.trim() || !client || !address || !orderDetails) return false
 
-      // Determine sender and recipient
       const isBuyer = address === orderDetails.buyerAddress
       const recipient = isBuyer ? orderDetails.merchantAddress : orderDetails.buyerAddress
 
@@ -151,7 +173,6 @@ export function useZKChat({ orderId, counterpartyAddress, autoFetchMessages = tr
   const uploadFile = async (file: File, isAnonymous = false) => {
     if (!client || !address || !orderDetails) return false
 
-    // Determine sender and recipient
     const isBuyer = address === orderDetails.buyerAddress
     const recipient = isBuyer ? orderDetails.merchantAddress : orderDetails.buyerAddress
 

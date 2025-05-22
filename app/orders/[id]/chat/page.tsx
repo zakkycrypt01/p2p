@@ -76,13 +76,15 @@ export default function ChatPage() {
               <p className="text-muted-foreground">Start the conversation about your order.</p>
             </div>
           ) : (
-            messages.map((message, index) => (
-              <ZKChatMessage
-                key={`${message.orderId}-${index}`} // Ensure uniqueness by combining orderId and index
-                message={message}
-                currentUser={address || ""}
-              />
-            ))
+            [...messages]
+              .sort((a, b) => a.timestamp - b.timestamp) // Sort messages by timestamp (old to new)
+              .map((message, index) => (
+                <ZKChatMessage
+                  key={`${message.orderId}-${index}`} // Ensure uniqueness by combining orderId and index
+                  message={message}
+                  currentUser={address || ""}
+                />
+              ))
           )}
         </div>
 

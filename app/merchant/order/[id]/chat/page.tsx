@@ -75,7 +75,15 @@ export default function MerchantChatPage() {
               <p className="text-muted-foreground">Start the conversation about this order.</p>
             </div>
           ) : (
-            messages.map((message) => <ZKChatMessage key={message.orderId} message={message} currentUser={address || ""} />)
+            [...messages]
+              .sort((a, b) => a.timestamp - b.timestamp) 
+              .map((message, index) => (
+                <ZKChatMessage
+                  key={`${message.orderId}-${index}`} 
+                  message={message}
+                  currentUser={address || ""}
+                />
+              ))
           )}
         </div>
 
